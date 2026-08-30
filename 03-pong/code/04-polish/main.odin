@@ -81,6 +81,10 @@ paddle_rect :: proc(p: Paddle) -> rl.Rectangle {
 	return {p.pos.x - PADDLE_W / 2, p.pos.y - PADDLE_H / 2, PADDLE_W, PADDLE_H}
 }
 
+draw_paddle :: proc(p: Paddle, color: rl.Color) {
+	rl.DrawRectangleRec(paddle_rect(p), color)
+}
+
 ball_serve_vel :: proc(toward_left: bool) -> rl.Vector2 {
 	angle := rand.float32_range(-0.4, 0.4)
 	dir: f32 = toward_left ? -1 : 1
@@ -229,8 +233,8 @@ main :: proc() {
 			rl.DrawCircleV(p.pos, 3, rl.Fade(rl.SKYBLUE, p.life * 2))
 		}
 
-		rl.DrawRectangleRec(paddle_rect(player), rl.WHITE)
-		rl.DrawRectangleRec(paddle_rect(opponent), rl.WHITE)
+		draw_paddle(player, rl.WHITE)
+		draw_paddle(opponent, rl.WHITE)
 		rl.DrawText(rl.TextFormat("%d", player.score), SCREEN_W / 2 - 80, 20, 60, rl.WHITE)
 		rl.DrawText(rl.TextFormat("%d", opponent.score), SCREEN_W / 2 + 50, 20, 60, rl.WHITE)
 

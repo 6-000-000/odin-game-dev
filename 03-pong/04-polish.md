@@ -38,18 +38,28 @@ update_ai :: proc(ai: ^Paddle, ball: Ball, dt: f32) {
 
 Three deliberate weaknesses make it fun to play against: it only tracks when the ball approaches (you can catch it resting), it moves slower than you (fast balls beat it), and the deadzone makes it look calm rather than robotic. **AI in arcade games is usually not about being smart — it's about being fun.** The two constants are your difficulty knobs; 330 vs your 400 is "normal". 400 is "impossible", 250 is "toddler".
 
+In `main`, the opponent's `↑`/`↓` input lines disappear, replaced by one call — and the `clamp` that follows stays exactly as it was, because the AI is bound by the same movement rules as the player it replaced:
+
+```odin
+update_ai(&opponent, ball, dt)
+opponent.pos.y = clamp(opponent.pos.y, PADDLE_H/2, SCREEN_H - PADDLE_H/2)
+```
+
 ### Sounds: three synthesized beeps
 
 Lesson 2.4's `make_beep` returns as a permanent tool — paddle hit (440 Hz), wall (220 Hz), score (660 Hz):
 
 ```odin
+rl.InitAudioDevice()        // alongside InitWindow, from lesson 2.4
+defer rl.CloseAudioDevice()
+
 hit_sfx := make_beep(440, 0.08)
 defer rl.UnloadSound(hit_sfx)
 // ...
 rl.PlaySound(hit_sfx)   // on paddle collision
 ```
 
-Copy the `make_beep` block verbatim from the snapshot. From now on, "add a beep for X" is a two-minute task in any project — placeholder audio is a superpower because sound feedback changes how a game *feels to develop*, not just to play.
+Copy the `make_beep` block verbatim from the snapshot. The three `rl.PlaySound` calls slot into blocks you already have: `hit_sfx` inside the paddle-collision `if`, `wall_sfx` (220 Hz, 0.06 s) inside both wall-bounce `if`s, `score_sfx` (660 Hz, 0.2 s) inside both out-of-bounds `if`s. From now on, "add a beep for X" is a two-minute task in any project — placeholder audio is a superpower because sound feedback changes how a game *feels to develop*, not just to play.
 
 ### Particles on impact
 
@@ -85,7 +95,15 @@ for i := len(particles) - 1; i >= 0; i -= 1 {
 }
 ```
 
-**Iterate backward when removing** (lesson 1.3's trick): `unordered_remove` swaps the last element into slot `i`; iterating forward would skip it. Backward iteration makes removal safe and branch-free. And they fade with `rl.Fade(rl.SKYBLUE, p.life * 2)` — alpha tied to remaining life.
+**Iterate backward when removing** (lesson 1.3's trick): `unordered_remove` swaps the last element into slot `i`; iterating forward would skip it. Backward iteration makes removal safe and branch-free.
+
+One placement detail: that update loop sits *outside* the state `switch` — particles keep drifting and fading on the title and game-over screens, so the menus never look frozen. Drawing is one loop, with alpha tied to remaining life:
+
+```odin
+for p in particles {
+	rl.DrawCircleV(p.pos, 3, rl.Fade(rl.SKYBLUE, p.life * 2))
+}
+```
 
 🌐 **Web dev callout — juice is your animation budget, spent differently**
 > On the web, "juice" is CSS transitions and easing curves — the browser interpolates, you declare. Here, juice is *simulation*: 12 structs with velocity and a countdown, drawn as fading circles. The reason games do it this way is the same reason Flappy couldn't use `element.animate()`: the effect must interact with a world that keeps changing. Particles inherit the ball's velocity because they live in the same physics as everything else. The good news is the budget: a burst like this costs maybe 40 lines and zero assets. The CSS of game feel is just... more game.

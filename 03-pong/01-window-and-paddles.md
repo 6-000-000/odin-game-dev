@@ -76,6 +76,28 @@ player.pos.y = clamp(player.pos.y, PADDLE_H/2, SCREEN_H - PADDLE_H/2)
 
 Because `pos` is the center, the allowed range is "half a paddle from each edge". Center-based storage makes this line self-evident; with top-left storage it's the kind of arithmetic you get subtly wrong at 1 AM.
 
+### Assemble the skeleton
+
+The loop itself is lesson 2.1's, verbatim — window, frame time, draw begin/end. The only new wiring is spawning the two paddles 30 px in from each wall, centered vertically:
+
+```odin
+main :: proc() {
+	rl.InitWindow(SCREEN_W, SCREEN_H, "Pong")
+	defer rl.CloseWindow()
+	rl.SetTargetFPS(60)
+
+	player := Paddle{pos = {30, SCREEN_H / 2}, speed = PADDLE_SPEED}
+	opponent := Paddle{pos = {SCREEN_W - 30, SCREEN_H / 2}, speed = PADDLE_SPEED}
+
+	for !rl.WindowShouldClose() {
+		dt := rl.GetFrameTime()
+		// input → clamp → draw
+	}
+}
+```
+
+The order inside the loop is always the same — read input, clamp, draw. That discipline matters more as entities multiply: everything that mutates state happens before `BeginDrawing`, so what you draw is always *this* frame's state.
+
 ## Full listing
 
 Runnable snapshot: [`code/01-window-and-paddles/main.odin`](code/01-window-and-paddles/main.odin)
@@ -92,7 +114,7 @@ Black window, two white paddles, W/S moves the left one, arrow keys move the rig
 
 1. **Easy:** Make the paddles different colors (`rl.SKYBLUE` vs `rl.ORANGE`) and pass the color through `draw_paddle`.
 2. **Easy:** Add `A`/`D` movement for the left paddle (x-axis), clamped to the left half of the screen. Yes, that's not Pong-rules — it's your sandbox.
-3. **Medium:** Add a `draw_center_line` proc: a dashed vertical line down the middle (a loop drawing 4×20 rectangles every 40px). It's in the next snapshot if you get stuck.
+3. **Medium:** Add a `draw_center_line` proc: a dashed vertical line down the middle (a loop drawing 4×20 rectangles every 40px). It's in lesson 3.3's snapshot if you get stuck.
 4. **Medium:** Make paddle speed *charge*: while holding SHIFT, `speed` lerps up to 800 over half a second; release and it snaps back. Feel how much "game feel" lives in tiny input-response details.
 
 **Next:** [3.2 Ball and collisions](02-ball-and-collisions.md)

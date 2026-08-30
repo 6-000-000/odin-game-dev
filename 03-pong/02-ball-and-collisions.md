@@ -8,6 +8,7 @@
 - Bounce off the top/bottom walls
 - Collide with paddles using circle-vs-rectangle (AABB) collision
 - Steer the ball by *where* it hits the paddle — Pong's actual gameplay
+- Reset the rally when the ball leaves the screen (scoring arrives next lesson)
 
 ## New concepts
 
@@ -29,7 +30,14 @@ Ball :: struct {
 }
 ```
 
-Movement is one line: `ball.pos += ball.vel * dt`. Everything else in this lesson is about deciding what `vel` *is*.
+Two constants join the block at the top of the file:
+
+```odin
+BALL_RADIUS :: 8
+BALL_SPEED :: 350
+```
+
+Movement is one line: `ball.pos += ball.vel * dt`. Everything else in this lesson is about deciding what `vel` *is*. Drawing is one call — `rl.DrawCircleV(ball.pos, BALL_RADIUS, rl.WHITE)` next to the two `draw_paddle` calls.
 
 The serve picks a shallow random angle and a random side — you never want the same serve twice:
 
@@ -57,6 +65,22 @@ Two details here, both load-bearing:
 1. **Check the velocity's sign too** (`vel.y < 0`). Without it, a ball that's already moving downward but still overlapping the edge gets flipped *upward* every frame and sticks to the wall. Only bounce balls that are actually heading out.
 2. **Snap the position back inside** (`pos.y = BALL_RADIUS`). The ball moved *past* the boundary this frame; if you only flip velocity it can sit outside for a frame — visible, and it can re-trigger the condition. Reflect velocity, correct position. This pair is the collision mantra for the whole course.
 
+### `paddle_rect`: one conversion, two consumers
+
+Collision needs the paddle as an `rl.Rectangle`, and drawing needs the same top-left corner — so the conversion from lesson 3.1's `draw_paddle` gets promoted into its own proc, and `draw_paddle` becomes a one-liner over it:
+
+```odin
+paddle_rect :: proc(p: Paddle) -> rl.Rectangle {
+	return {p.pos.x - PADDLE_W/2, p.pos.y - PADDLE_H/2, PADDLE_W, PADDLE_H}
+}
+
+draw_paddle :: proc(p: Paddle, color: rl.Color) {
+	rl.DrawRectangleRec(paddle_rect(p), color)
+}
+```
+
+One conversion, two consumers (render + collision). If the paddle's shape ever changes, you edit one proc and the picture and the physics stay in sync.
+
 ### Paddle collision: circle vs AABB
 
 raylib does the hard geometry; we do the consequences:
@@ -74,9 +98,24 @@ for p in paddles {
 }
 ```
 
+Bundling both paddles into a `[2]Paddle` array lets one loop handle left and right identically — no duplicated collision block to drift out of sync. (The loop iterates *copies*; that's fine, we only read the paddle and mutate the ball.)
+
 The push-out line uses the ternary to place the ball on the correct *side* of the paddle (right side of the left paddle, left side of the right paddle) so it can't get trapped inside and double-bounce.
 
 The `offset` math is the game design: `(ball.y - paddle.y) / half_height` is −1 at the paddle's top edge, 0 dead center, +1 at the bottom. Mapping that to `vel.y` means **center hits go straight, edge hits go steep** — the player aims by positioning the paddle. Pong with `vel.y = -vel.y` bouncing is unplayable chaos; Pong with offset aiming is a skill game. One line of math is the difference.
+
+### Out of bounds: reset the rally
+
+The last piece has no scoring yet — that's next lesson — so for now a missed ball just re-serves:
+
+```odin
+if ball.pos.x < -BALL_RADIUS || ball.pos.x > SCREEN_W + BALL_RADIUS {
+	ball.pos = {SCREEN_W / 2, SCREEN_H / 2}
+	ball.vel = ball_serve_vel()
+}
+```
+
+The boundary test is `< -BALL_RADIUS`, not `< 0`: the ball must be *fully* off-screen before the reset, so it visibly leaves play instead of teleporting while half-visible. Same reset on both sides; next lesson replaces it with score-keeping.
 
 🌐 **Web dev callout — collision as intersection tests**
 > If you've ever written `rect1.left < rect2.right && ...` for drag-and-drop or scroll-into-view, you've written AABB collision. Games just do it every frame for every moving pair. raylib's `CheckCollision*` family covers the common pairs (rec/rec, circle/circle, circle/rec, point/*) — the [cheatsheet](https://www.raylib.com/cheatsheet/cheatsheet.html) lists them all. For 2D arcade games, these primitives are genuinely all you need.

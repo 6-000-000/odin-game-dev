@@ -52,6 +52,30 @@ case .Game_Over:
 
 Notice what each state transition *does*: entering `.Playing` resets scores (initialization belongs at transitions, not scattered around). The draw switch mirrors it — Title draws the big title + prompt, Playing draws the ball, Game_Over draws the winner.
 
+### Small upgrades to last lesson's code
+
+Three additions to lesson 3.2's code carry the new features. `Paddle` gains a `score` field — the score belongs to the entity, not a loose global — and `WIN_SCORE` joins the constants:
+
+```odin
+WIN_SCORE :: 10
+
+Paddle :: struct {
+	pos:   rl.Vector2,
+	speed: f32,
+	score: int,
+}
+```
+
+And `ball_serve_vel` takes a direction — lesson 3.2's first exercise, made official:
+
+```odin
+ball_serve_vel :: proc(toward_left: bool) -> rl.Vector2 {
+	angle := rand.float32_range(-0.4, 0.4)
+	dir: f32 = toward_left ? -1 : 1
+	return {dir * BALL_SPEED * math.cos(angle), BALL_SPEED * math.sin(angle)}
+}
+```
+
 🌐 **Web dev callout — it's a reducer with a render function**
 > This is the `useReducer` pattern you already know: a finite set of states, explicit transitions triggered by events (key presses, scores), and UI as a pure function of state. The difference: no library, no dispatch — just a `switch` that runs 60 times a second. Games lean on this pattern *constantly*: menus, pause, cutscenes, boss phases. When a game dev says "state machine", they mean exactly this enum+switch, not a framework.
 
@@ -69,6 +93,8 @@ if ball.pos.x < -BALL_RADIUS {
 
 Note the out-of-bounds test is `< -BALL_RADIUS`: the ball fully leaves the screen before the point registers. Using `< 0` would trigger while half the ball is still visible — feels wrong, looks wrong.
 
+The right edge is the mirror image: `ball.pos.x > SCREEN_W + BALL_RADIUS` scores for the *player* and serves right (`ball_serve_vel(false)`). After either score, check `player.score >= WIN_SCORE || opponent.score >= WIN_SCORE` and transition to `.Game_Over`.
+
 ### The HUD
 
 Scores draw on top of everything, flanking the center line:
@@ -78,7 +104,19 @@ rl.DrawText(rl.TextFormat("%d", player.score), SCREEN_W/2 - 80, 20, 60, rl.WHITE
 rl.DrawText(rl.TextFormat("%d", opponent.score), SCREEN_W/2 + 50, 20, 60, rl.WHITE)
 ```
 
-And two small helpers carry the whole UI — a dashed center line, and centered text using `MeasureText` (lesson 2.2):
+And two small helpers carry the whole UI. The dashed center line (lesson 3.1's exercise, answered):
+
+```odin
+draw_center_line :: proc() {
+	y: i32 = 0
+	for y < SCREEN_H {
+		rl.DrawRectangle(SCREEN_W / 2 - 2, y, 4, 20, rl.DARKGRAY)
+		y += 40
+	}
+}
+```
+
+... and centered text using `MeasureText` (lesson 2.2):
 
 ```odin
 draw_centered :: proc(text: cstring, y, font_size: i32, color: rl.Color) {
@@ -88,6 +126,22 @@ draw_centered :: proc(text: cstring, y, font_size: i32, color: rl.Color) {
 ```
 
 Keep helpers like these at the bottom of the file and reuse them forever — `draw_centered` will serve every title screen you ever make.
+
+The draw `switch` mirrors the update one and is built entirely from these helpers. Draw order: world first (center line, paddles), then the HUD scores, then the state-specific screen on top — so `.Playing` is the only state that draws the ball:
+
+```odin
+switch state {
+case .Title:
+	draw_centered("PONG", 150, 80, rl.WHITE)
+	draw_centered("first to 10 — SPACE to start", 260, 20, rl.GRAY)
+case .Playing:
+	rl.DrawCircleV(ball.pos, BALL_RADIUS, rl.WHITE)
+case .Game_Over:
+	winner: cstring = player.score > opponent.score ? "LEFT WINS!" : "RIGHT WINS!"
+	draw_centered(winner, 150, 60, rl.WHITE)
+	draw_centered("SPACE for menu", 240, 20, rl.GRAY)
+}
+```
 
 ## Full listing
 
