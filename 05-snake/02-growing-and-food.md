@@ -43,7 +43,7 @@ spawn_food :: proc(snake: [dynamic]Cell) -> Cell {
 
 How often does this actually retry? Expected attempts are `1 / free_fraction` — barely above 1 early on, pathological only when the board is nearly full (at which point you've essentially won Snake). The exact alternative: collect every free cell into a list and pick one entry — O(cells) work and memory per spawn, zero luck involved. Rejection sampling trades a theoretical worst case for three lines of code. Take the trade.
 
-(`rand.int31_max(n)` returns an `i32` in `[0, n)`; the `int(...)` converts it to `Cell`'s field type. `rl.GetRandomValue(0, COLS - 1)` would do the job too — both are already in your toolbox.)
+(`rand.int31_max(n)` returns an `i32` in `[0, n)`; the `int(...)` converts it to `Cell`'s field type. `rl.GetRandomValue(0, COLS - 1)` would do the job too — both are already in your toolbox.) Two imports join the top of the file for this lesson: `import "core:math"` (the food pulse's `sin`) and `import "core:math/rand"` (`int31_max`).
 
 ### Eating: growth is a pop you skip
 
@@ -83,7 +83,7 @@ SPEEDUP :: 0.004
 tick = max(MIN_TICK, START_TICK - SPEEDUP * f32(score))
 ```
 
-0.15s per hop at the start, 4ms shaved per food, floored at 0.06s — around score 22 you hit the floor and the game is pure reflexes. (`max` is a built-in, like `min`, `clamp`, `abs`.) Three constants and Snake's whole difficulty curve falls out. And remember exercise 1 from last lesson: as the tick shrinks, input *latency* shrinks with it — the game grows more responsive exactly as it demands more precision. The ramp isn't just difficulty, it's feel.
+0.15s per hop at the start, 4ms shaved per food, floored at 0.06s — at score 23 the formula would dip below the floor (0.15 − 0.004×23 = 0.058), so from there on the game is pure reflexes. (`max` is a built-in, like `min`, `clamp`, `abs`.) Three constants and Snake's whole difficulty curve falls out. And remember exercise 1 from last lesson: as the tick shrinks, input *latency* shrinks with it — the game grows more responsive exactly as it demands more precision. The ramp isn't just difficulty, it's feel.
 
 ### Pulsing food: a second clock
 
@@ -93,7 +93,7 @@ food_center := rl.Vector2{f32(food.x * CELL + CELL / 2), f32(food.y * CELL + CEL
 rl.DrawCircleV(food_center, (CELL / 2 - 4) * pulse, rl.RED)
 ```
 
-`rl.GetTime()` is seconds since `InitWindow` (an `f64`, hence the cast). The sine swings the radius ±15%, and the food is drawn as a circle centered in its cell (`cell * CELL + CELL/2`, in pixel space). Here's the payoff of the accumulator split: the simulation hops a few times per second, but this animation runs at full frame rate, because it's *render state*, not *game state* — nothing in the sim reads the pulse. Once you start asking "which clock does this belong on?", every effect in every game gets easier to place.
+`rl.GetTime()` is seconds since `InitWindow` (an `f64`, hence the cast). The sine swings the radius ±15%, and the food is drawn as a circle centered in its cell (`cell * CELL + CELL / 2`, in pixel space). Here's the payoff of the accumulator split: the simulation hops a few times per second, but this animation runs at full frame rate, because it's *render state*, not *game state* — nothing in the sim reads the pulse. Once you start asking "which clock does this belong on?", every effect in every game gets easier to place.
 
 The HUD is one line, borrowed straight from Pong:
 
@@ -122,5 +122,6 @@ A red, gently pulsing morsel sits on the grid. Eat it: the snake grows by one ce
 2. **Easy:** Tune the pulse: change the `6` (rate) and `0.15` (amplitude), or pulse the alpha instead of the radius with `rl.Fade(rl.RED, ...)`. Nothing about gameplay changes — it's a render clock.
 3. **Medium:** Implement the collect-free-cells spawner: build a `[dynamic]Cell` of every cell not on the body (nested `for y in 0 ..< ROWS` / `for x in 0 ..< COLS` loops), return `free[int(rand.int31_max(i32(len(free))))]`, `delete` the list. Run both versions, then keep the one you'd rather maintain.
 4. **Medium:** Add a bonus cherry: every 5th food also spawns a golden morsel worth 3 points that despawns after 5 seconds (`cherry: Cell`, `cherry_timer: f32`, `cherry_active: bool`). The despawn counts down per frame on `dt` — a third clock, neither the tick nor wall-clock.
+5. **Hard:** Growth burst: every 10th food grants +5 length at once. A single `grow: bool` can't do it — it lasts one tick — so introduce `pending_growth: int`: eating sets it to 5, and each tick calls `step(&snake, dir, pending_growth > 0)` then decrements it. State spread *across ticks* is the real mechanic; every Snake-like with bonus food ships exactly this.
 
 **Next:** [5.3 Death, score, and saving](03-death-and-score.md)

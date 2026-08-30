@@ -36,7 +36,7 @@ if rl.IsKeyReleased(.SPACE) do cut_jump_short()   // the frame it goes up
 
 Using the wrong one is a classic bug: `IsKeyDown` for jumping gives 60 jumps per second; `IsKeyPressed` for movement gives a 1-frame nudge per press.
 
-> **🌐 Web dev callout — goodbye, `addEventListener`**
+🌐 **Web dev callout — goodbye, `addEventListener`**
 > Web input is push-based: the browser queues events and calls your handlers whenever they fire. Game input is pull-based: the OS updates a state table, and your loop reads it once per frame. The model is simpler than it sounds — `keysDown` is a set you query, not a stream you consume. The tradeoff: if your frame rate stutters, a quick tap could be missed *between* polls... except raylib polls input at the start of every frame and tracks pressed-this-frame, so taps are never lost at 60 fps. For simulation steps slower than frame rate (Snake's 10 Hz grid), you *do* need input buffering — lesson 5.1 covers exactly that.
 
 ## Keys you'll use constantly

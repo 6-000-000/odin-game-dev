@@ -4,7 +4,7 @@
 
 ## Goals
 
-- Build a mini-ECS in ~150 lines: entities as handles, components as columns, systems as sweeps
+- Build a mini-ECS in ~180 lines: entities as handles, components as columns, systems as sweeps
 - Keep 9.1's promise: generation counters make references into a pool *safe*
 - Compose entity "kinds" out of component mixes — no types, no inheritance
 - Settle on one `bit_set` idiom for multi-component tests and use it everywhere
@@ -74,7 +74,7 @@ World :: struct {
 
 Note `Spin` owns *two* columns (`angles` and `spins`): a component is a semantic role — "has an angle that rotates" — not a single field. And `scales` has no mask bit at all: it's scratch space a system writes and the draw code reads, not something entities *have*.
 
-> **🌐 Web dev callout — an ECS is an in-memory relational database**
+🌐 **Web dev callout — an ECS is an in-memory relational database**
 > You've seen this architecture, just with different names. Entities are **row ids**. Component arrays are **table columns** — `positions` is `TABLE position (entity_id, x, y)`. The mask is the **schema per row** (ECS rows are schemaless-per-entity, like a document store with a field index). And a system is a **query** that runs every frame: `system_move` is literally `SELECT i WHERE mask HAS (Position, Velocity) UPDATE positions …`. If you've used LINQ or an ORM, `world.masks[i] >= {.Position, .Velocity}` is the `WHERE` clause. The honest differences: a real DB builds indexes to *avoid* scanning; our mini-ECS just scans all 1024 rows per query per frame — cheap at this scale, and when it stops being cheap, the fix is 8.3's spatial hash or 9.2's layout, not a fancier ECS.
 
 ### Spawn, despawn, and the generation trick
@@ -122,6 +122,8 @@ is_alive :: proc(world: ^World, e: Entity) -> bool {
 ```
 
 Walk the scenario: a bullet despawns, `generations[7]` goes 0→1, slot 7 lands on the free list. A comet spawns, pops slot 7, and gets handle `{7, 1}`. Some system still holds the bullet's old `{7, 0}` — `is_alive` compares 0 against the slot's current 1 and *rejects it*. The stale handle fails loudly (returns `false`) instead of silently moving the comet. That's the entire trick: **recycling is safe because the ticket expires.**
+
+(One line in `spawn_entity` may look odd to a web dev: `world.masks[idx] = nil`. For Odin's built-in set types, `nil` *is* the empty set — no pointer involved. It zeroes the mask so the recycled slot starts with no components.)
 
 ### Components: a column write plus a bit
 
@@ -196,9 +198,11 @@ spawn_comet :: proc(world: ^World, pos: rl.Vector2) -> Entity {
 }
 ```
 
-Blinkers are Position+Pulse+Lifetime, drifters are Position+Velocity+Lifetime, spinners are Position+Spin. SPACE spawns 100 entities with every component rolled independently — and every system picks off exactly the entities carrying its bits, no matter how strange the mix. **A new kind is a new combination of existing columns.** If you've ever mix-and-matched React hooks or middleware, you know the feeling: behavior assembled from orthogonal pieces.
+Blinkers are Position+Pulse+Lifetime, drifters are Position+Velocity+Lifetime, spinners are Position+Spin. SPACE spawns 100 entities with every component rolled independently — and every system picks off exactly the entities carrying its bits, no matter how strange the mix. **A new kind is a new combination of existing columns.** If you've ever mix-and-matched React hooks or middleware, you know the feeling: behavior assembled from orthogonal pieces. (`random_vel` in the recipe is 7.2's `random_drift` under a new name: random direction, random speed in range.)
 
-Drawing is also mask-driven — the first combo an entity's mask satisfies decides its shape (comets = rotated triangles, blinkers = breathing circles, drifters = squares, spinners = rotating plus signs). The systems never see this; a random mix drawn as a blinker still *moves* if it has Velocity, because `system_move` only reads the mask.
+Drawing is also mask-driven — the first combo an entity's mask satisfies decides its shape (comets = rotated triangles, blinkers = breathing circles, drifters = squares, spinners = rotating plus signs), and anything matching no combo — a bare Position entity, say — falls through to a gray dot. The systems never see this; a random mix drawn as a blinker still *moves* if it has Velocity, because `system_move` only reads the mask.
+
+(The snapshot's file roles, for orientation: `ecs.odin` is the framework — Entity, World, spawn/despawn, adders, systems. `playground.odin` is the content — the four recipes, the random mixer, all drawing. `main.odin` is input, timing, and the HUD. When 9.4 ports a real game onto this, only the playground file gets replaced.)
 
 The playground also makes the generation lesson concrete. T stores a comet's handle; K kills it *through the lifetime system* (a zero-second Lifetime), the frame's systems retire it, and a replacement comet spawns into the freed slot:
 
@@ -211,7 +215,7 @@ if rl.IsKeyPressed(.K) && has_tracked && is_alive(&world, tracked) {
 }
 ```
 
-The HUD then shows the stored handle — `{index 7, gen 0}` — failing `is_alive` in red, with the slot's new generation alongside it. Stale ticket, rejected at the door.
+The HUD then shows the stored handle — `{index 7, gen 0}` — failing `is_alive` in red, with the slot's new generation alongside it. Stale ticket, rejected at the door. (The two-phase flow behind it: K sets `want_probe`; *after* the systems run, `main` spawns the replacement comet at a fixed spot `{SCREEN_W / 2, 120}`, clears `want_probe`, and sets `probed` so the HUD shows the before/after. The replacement is what guarantees the slot actually got recycled — the demo needs a new tenant in the old slot to prove the old ticket fails.)
 
 ## Full listing
 

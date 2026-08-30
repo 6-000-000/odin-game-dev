@@ -92,6 +92,7 @@ make_beep :: proc(frequency, duration: f32) -> rl.Sound {
 	return sound
 }
 
+// The collision rects ARE the draw rects — one source of truth.
 pipe_top_rect :: proc(p: Pipe) -> rl.Rectangle {
 	return {p.x, 0, PIPE_W, p.gap_y - p.gap_h / 2}
 }
@@ -284,6 +285,8 @@ main :: proc() {
 					state = .Dead
 				}
 
+				// scoring trigger: fires once, the frame the pipe's right edge
+				// crosses behind the bird — edge detection, not overlap counting
 				if !p.scored && p.x + PIPE_W < bird.pos.x {
 					p.scored = true
 					score += 1

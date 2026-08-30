@@ -38,7 +38,7 @@ export PATH="$HOME/path/to/Odin:$PATH"
 
 Full instructions for every platform live at [odin-lang.org/docs/install](https://odin-lang.org/docs/install/).
 
-> **🌐 Web dev callout — where's the package manager?**
+🌐 **Web dev callout — where's the package manager?**
 > There isn't one, and you won't miss it. Odin ships with a `core:` library (fmt, math, strings, containers…) and a `vendor:` library (raylib, SDL, box2d, stb…). You import them with no install step, no lockfile, no `node_modules`. The compiler is the whole toolchain: compiler, linker driver, and formatter (`odin fmt`) in one binary.
 
 ## Step 2 — Editor setup (optional but recommended)
@@ -87,7 +87,6 @@ Five things happened, and you'll use this exact skeleton in every project:
 4. `for !rl.WindowShouldClose() { ... }` — the **game loop**. It runs until the user presses ESC or clicks the window's close button.
 5. `BeginDrawing` / `ClearBackground` / `DrawText` / `EndDrawing` — every frame: wipe the screen, draw things, present.
 
-> **🌐 Web dev callout — `rl.` is a namespace import**
 > `import rl "vendor:raylib"` is exactly `import * as rl from "vendor:raylib"`. Odin always requires an explicit name for imports, so you always know where a symbol comes from. Also note: raylib's API is `PascalCase` in Odin (`rl.DrawText`, `rl.GetFrameTime`), matching the C library. Odin's own `core:` packages are `snake_case` (`fmt.println`). You'll develop an eye for it within an hour.
 
 ## Troubleshooting
@@ -106,7 +105,7 @@ odin run 00-setup/code/01-hello-window
 
 ## Checkpoint
 
-A white-ish window titled "My first raylib window" with centered text, staying open until you close it. The terminal prints nothing and the CPU stays near idle — raylib is pacing the loop for you.
+A white-ish window titled "My first raylib window" with centered text, staying open until you close it. The terminal shows only raylib's `INFO` log lines and the CPU stays near idle — raylib is pacing the loop for you.
 
 ## Exercises
 

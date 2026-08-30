@@ -57,6 +57,29 @@ Settings :: struct {
 
 **Every tuning constant of the simulation lives in this one struct** and is passed to every proc that needs it. It looks like overkill for 20 boids — but in lesson 8.4 we'll wire these fields to on-screen sliders and tune a living flock in real time, without touching the update code. Design the plumbing now, enjoy it later.
 
+The snapshot fills the struct with the values that carry the whole module, and names today's three top-level constants alongside:
+
+```odin
+BOID_COUNT :: 20
+BOID_SIZE :: 8 // px from center to nose
+WANDER :: 0.05 // fraction of max_steer applied as random jitter
+
+default_settings :: proc() -> Settings {
+	return {
+		max_speed = 320,
+		min_speed = 180,
+		max_steer = 900,
+		perception_radius = 75,
+		avoid_radius = 35,
+		w_sep = 1.4,
+		w_align = 1.0,
+		w_coh = 1.0,
+	}
+}
+```
+
+Only cohesion and `WANDER` do anything today; the rest is plumbing for 8.2–8.4.
+
 ### Steering: desired minus current
 
 A boid doesn't teleport toward its goal; it *steers*, like a plane banking. Given a direction it wants to go, the math is always the same three steps:
@@ -71,6 +94,16 @@ steer_toward :: proc(dir, vel: rl.Vector2, s: Settings) -> rl.Vector2 {
 1. `desired` — full speed in the wanted direction.
 2. `desired - vel` — the velocity *change* that would get us there instantly.
 3. `clamp_length(..., max_steer)` — but a boid has limited turning power, so cap the change. `max_steer` is the difference between a hummingbird and an oil tanker.
+
+`clamp_length` is the magnitude cap you'd expect — scale down proportionally when over the limit, pass through otherwise:
+
+```odin
+clamp_length :: proc(v: rl.Vector2, max_len: f32) -> rl.Vector2 {
+	len := rl.Vector2Length(v)
+	if len > max_len && len > 0 do return v * (max_len / len)
+	return v
+}
+```
 
 Why `safe_normalize` and not `rl.Vector2Normalize`? Because `rl.Vector2Normalize({0, 0})` divides by length 0 and yields **NaN** — and one NaN velocity poisons every sum it touches (NaN + anything = NaN; soon half your flock is at coordinates `nan, nan` and the screen is empty). Guard it once, use it everywhere:
 
@@ -146,7 +179,7 @@ for &b, i in boids {
 
 Note the trick in the accumulator: instead of summing absolute positions (which breaks across the seam), we sum the *relative* offsets `to_other`. `b.pos + coh_sum/count` is the perceived center, so the direction to it is just `coh_sum/count` — already relative, seam-safe.
 
-The integration order matters and never changes for the rest of the module: **clamp the steering, apply it to velocity, clamp the speed, move, wrap.** `clamp_speed` keeps speed inside `[min_speed, max_speed]` — boids are like sharks, they can't hover.
+The integration order matters and never changes for the rest of the module: **clamp the steering, apply it to velocity, clamp the speed, move, wrap.** `clamp_speed` keeps speed inside `[min_speed, max_speed]` — boids are like sharks, they can't hover. It has one surprise clause: besides capping at `max_speed` and boosting to `min_speed`, a *near-zero* velocity is replaced outright with a random direction at `min_speed` — rather than let a boid degenerate to a standstill, the sim kicks it awake. (That branch consumes RNG state, which would perturb the deterministic-seed story below — in practice it almost never fires.)
 
 ### Drawing: a triangle that faces its velocity
 
@@ -166,7 +199,7 @@ One last setup detail — we seed the RNG:
 rand.reset(0xB01D5) // fixed seed = reproducible flock (change it!)
 ```
 
-Same seed, same flock, every run. When something looks wrong you can debug a *deterministic* simulation; change the seed when you want a new flock.
+Same seed, same flock, every run. When something looks wrong you can debug a *deterministic* simulation; change the seed when you want a new flock. The seed feeds `random_boid(s, w, h)`, called once per boid at startup: a random position, and a random direction at a random speed inside `[min_speed, max_speed]` — so the same seed deals the same opening frame, boid for boid.
 
 🌐 **Web dev callout — emergence is just `reduce` over local state**
 > Each boid is a pure function of its neighborhood: take the boids within 75 px, reduce them to an average, steer toward it. No coordinator, no events, no subscriptions — the flock-shaped "global state" you see on screen *doesn't exist anywhere in memory*. If you've ever derived UI from `items.reduce(...)` instead of storing derived state, you know the pattern: compute what you can, store only what you must. The eerie part of boids is how much you can compute with so little stored: two `Vector2`s per bird.
@@ -188,5 +221,6 @@ odin run 08-boids/code/01-the-flocking-rules
 1. **Easy:** Draw the perception circle of the boid nearest the mouse. Find the nearest boid each frame (`offset` + `Vector2Length`), then `rl.DrawCircleLines` with `s.perception_radius`. Watch which flockmates fall inside it.
 2. **Medium:** Build an *alignment-only* variant: replace the cohesion accumulator with `align_sum += other.vel` and steer toward `align_sum / f32(count)`. No cohesion, no separation. You'll get synchronized lanes of boids that never group up — a great intuition for what each rule contributes.
 3. **Medium:** Color boids by speed: compute `t := clamp((speed - s.min_speed) / (s.max_speed - s.min_speed), 0, 1)` and draw with `rl.ColorLerp(rl.SKYBLUE, rl.RED, t)`. (Lesson 8.4 does this for real — Lague's sim does it too.)
+4. **Hard:** Separation as personality: pick the boid nearest the mouse and give *it alone* a separation rule — steer it away from every neighbor within 35 px at 3× the cohesion weight, drawn red. The flock should eject it like an immune system. One boid with different weights is the entire idea of 8.4's predator, seen from the inside.
 
 **Next:** [8.2 The naïve implementation](02-naive-boids.md)

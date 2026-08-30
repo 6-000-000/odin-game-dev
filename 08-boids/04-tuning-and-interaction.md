@@ -46,6 +46,19 @@ camera_update :: proc(cam: ^rl.Camera2D) {
 
 Pan is intuitive: divide the mouse delta by `zoom` because a screen pixel is `1/zoom` world pixels. Zoom-to-cursor is the classic two-sample trick: the world point under the mouse *before* the zoom must equal the world point under the mouse *after* it; the difference of the two is exactly how much to nudge `target`. Without that correction, zooming orbits the view around the offset — try deleting the `target +=` line and feel the difference.
 
+The zoom clamps used above are `ZOOM_MIN :: 0.3`, `ZOOM_MAX :: 3.0`, `ZOOM_STEP :: 0.1`, and the camera starts centered on the world, zoomed out so most of it is visible:
+
+```odin
+camera_init :: proc() -> rl.Camera2D {
+	return {
+		offset = {SCREEN_W / 2, SCREEN_H / 2}, // screen center...
+		target = {WORLD_W / 2, WORLD_H / 2}, // ...shows world center
+		rotation = 0,
+		zoom = 0.6, // start zoomed out: most of the world visible
+	}
+}
+```
+
 The world (boids, world border, predator, debug circles, scare ring) draws between `rl.BeginMode2D(cam)` and `rl.EndMode2D()`; the HUD and sliders draw *after*, in untransformed screen pixels. One boundary, total clarity about which space any pixel lives in.
 
 ### raygui: sliders wired straight into `Settings`
@@ -60,12 +73,16 @@ ui_slider :: proc(label: cstring, value: ^f32, min, max: f32, y: ^f32) {
 }
 ```
 
-Drag the handle and raygui writes through `value` — which points *directly* at `settings.w_sep`, `settings.perception_radius`, …. The sim reads the new numbers on the very next frame. No bindings, no change detection, no store. This is why lesson 8.1 insisted on one `Settings` struct threaded everywhere: six `ui_slider` calls later, the entire simulation is live-tunable.
+Drag the handle and raygui writes through `value` — which points *directly* at `settings.w_sep`, `settings.perception_radius`, …. The sim reads the new numbers on the very next frame. No bindings, no change detection, no store. This is why lesson 8.1 insisted on one `Settings` struct threaded everywhere: six `ui_slider` calls later, the flock's personality is live-tunable. (Three fields deliberately get no slider: `max_speed`, `min_speed`, and `max_steer` change how flight *feels* rather than how the flock *shapes* — tune those with a recompile and a watchful eye.)
+
+The panel around the sliders is one rect — `PANEL_RECT :: rl.Rectangle{SCREEN_W - 250, 8, 242, 200}`, drawn with `rl.GuiPanel` — and one startup line keeps raygui's tiny default text readable: `rl.GuiSetStyle(.DEFAULT, i32(rl.GuiDefaultProperty.TEXT_SIZE), 12)`.
 
 Two sliders need a nudge beyond writing a float:
 
 - **Boid count** is an `f32` slider over a preallocated pool (`MAX_BOIDS = 4096`). When it changes, `set_boid_count` grows the array with fresh random boids or `resize`s it smaller — never a reallocation in the loop.
-- **Perception radius** is the grid's cell size. When it changes we call `grid_resize`, which recomputes `cells_x/cells_y` — no reallocation either, because `grid_init` sized every array for the worst case (the slider's 20 px minimum → 128×72 cells) and `grid_rebuild` only touches the active prefix. The zero-per-frame-allocation rule from lesson 8.3 survives runtime tuning.
+- **Perception radius** is the grid's cell size. When it changes we call `grid_resize`, which recomputes `cells_x/cells_y` — no reallocation either, because the arrays were sized for the worst case up front (the slider's 20 px minimum → `MAX_CELLS :: 128 * 72`) and `grid_rebuild` only touches the active prefix. The zero-per-frame-allocation rule from lesson 8.3 survives runtime tuning. That worst-case sizing is why `grid_init`'s signature changed since 8.3: `grid_init(grid, world_w, world_h, cell_size, max_boids)` became `grid_init(grid, max_cells, max_boids)` — world size and cell size are *runtime* values now, so init no longer wants them.
+
+One tuning footgun to know about: the avoid-radius slider tops out at 80 while the perception slider bottoms at 20 — so you *can* drag `avoid_radius` above `perception_radius`, making boids flee neighbors they can't perceive. The sim won't break, but the flock goes haunted: boids spook away from things that aren't "there". Keep avoid below perception.
 
 ### Hazards: the scare point and the predator are the same math
 
@@ -86,13 +103,16 @@ Each frame `main.odin` packs the active hazards — the left-mouse scare point (
 b.vel += clamp_length(accel, s.max_steer) * dt
 // ...but fear doesn't: hazard steer is added AFTER the clamp
 for h in hazards {
+	to_me := offset(h.pos, b.pos, WORLD_W, WORLD_H) // wrap-aware: fear works across the seam
 	if rl.Vector2Length(to_me) < h.radius {
 		b.vel += steer_toward(to_me, b.vel, s) * h.strength * dt
 	}
 }
 ```
 
-Flocking acceleration is clamped to `max_steer`; fear is added *after* the clamp. Strength 5–8 genuinely out-muscles cohesion, so boids *break formation* to escape — a flock of rule-followers would politely ignore the predator. The predator itself is the video's: a red triangle at constant speed with a random-walk heading (`heading += rand.float32_range(-TURN, TURN) * dt`), and the flock parts around it like water.
+Flocking acceleration is clamped to `max_steer`; fear is added *after* the clamp. Strength 5–8 genuinely out-muscles cohesion, so boids *break formation* to escape — a flock of rule-followers would politely ignore the predator. Note the `offset()` call: hazards measure distance wrap-aware, so a predator near the edge scares boids on the *other* side too — the same seam rule the flocking rules obey.
+
+The predator itself is the video's: a red triangle at constant `PRED_SPEED :: 380.0` — deliberately a bit faster than the boids' `max_speed`, so it can actually catch up — on a random-walk heading (`heading += rand.float32_range(-PRED_TURN, PRED_TURN) * dt`, with `PRED_TURN :: 2.2` rad/s of wander), respawned at the world center each time you toggle it with P. The flock parts around it like water.
 
 ### Speed coloring
 
@@ -104,6 +124,12 @@ color := rl.ColorLerp(rl.SKYBLUE, rl.RED, t)
 ```
 
 Press D to overlay every boid's perception circle — expensive at 4,000 boids, invaluable for debugging, which is exactly what a debug toggle is for.
+
+### Housekeeping: what moved since 8.3
+
+- **The 1/2/3 preset keys are gone** — the count slider replaced them (and the initial spawn is 2,000 boids at startup).
+- **`random_boid` lost its `w, h` parameters** — it reads the `WORLD_W`/`WORLD_H` constants directly.
+- **`draw_boid` grew a `draw_agent` helper**: the triangle-from-heading math from 8.1, factored out so boids *and* the predator share one drawing routine. `draw_boid`'s signature changed with it — `draw_boid(b, color)` became `draw_boid(b, s)`, because speed coloring needs the settings' speed range.
 
 🌐 **Web dev callout — immediate-mode GUI vs the DOM**
 > raygui is the anti-React. There's no component tree, no diffing, no `useState`: each frame you call `GuiSlider(rect, label, text, &value, min, max)` and it draws itself, reads the mouse, and writes the float. State lives in *your* plain variables; the UI is a pure function of it, rebuilt from scratch 60 times a second. It sounds wasteful until you notice it costs microseconds — and that "the UI is stale" is a bug class that simply cannot exist. You already know this mindset: it's the game loop from lesson 2.1, applied to UI.
@@ -126,6 +152,6 @@ A 2560×1440 world under a working camera: right-drag pans, the wheel zooms towa
 1. **Easy:** Flip a hazard into an *attractor*: right-mouse attracts boids toward the cursor instead of repelling. You need one sign change — but try strength 2 and watch boids orbit the point instead of landing on it. Why don't they stop? (`min_speed`.)
 2. **Medium:** Circular obstacles: place 3–4 fixed hazards (strength ~3, drawn as dark circles) at interesting spots and watch streams of boids split around them and re-form downstream. This is the "flow around a rock" shot from every flocking demo.
 3. **Medium:** Leader boid: add one boid that ignores the rules and eases toward the mouse (`pos = rl.Vector2Lerp(pos, mouse_world, 2*dt)`), drawn in gold. With cohesion up and separation down, the flock follows it — you've invented shepherding.
-4. **Hard:** Settings save/load: F5 writes the current `Settings` to a text file with `os.write_entire_file` (you did this for Snake's high score — write with `fmt.aprintf`, one `key=value` per line), F9 reads it back with `os.read_entire_file` + `strings.split` + `strconv.parse_f32`. Now you can version-control your favorite flock "personalities".
+4. **Hard:** Settings save/load: F5 writes the current `Settings` to a text file with `os.write_entire_file` (you did this for Snake's high score — `fmt.tprintf` + `transmute([]u8)`, one `key=value` per line), F9 reads it back with `os.read_entire_file` + `strings.split` + `strconv.parse_f32`. Now you can version-control your favorite flock "personalities".
 
 **Next:** [Module 9 — Game Architecture: the pattern field guide](../09-game-architecture/01-pattern-field-guide.md)

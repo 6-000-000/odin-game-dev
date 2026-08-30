@@ -28,6 +28,7 @@ Back in [lesson 2.5](../02-game-dev-foundations/05-architecture-roadmap.md) this
 - **Game loop + delta time** — *Reach for:* always. *Breaks:* when a frame hitch lets fast objects tunnel through walls → then add…
 - **Fixed timestep accumulator** — *Reach for:* grid games (Snake), deterministic sims, replays, netcode. *Breaks:* render-sim rate mismatch causes visible stutter without interpolation (you saw this in 2.1's exercise).
 - **State machine (enum + switch)** — *Reach for:* any game with distinguishable "modes." *Breaks:* when switches nest switches (boss phases inside playing inside paused…) → that's a statechart/scene manager's job, below.
+- **Input buffering** — *Reach for:* discrete-step games where instant input breaks invariants (Snake's 180° reversal), combo windows, jump buffering in platformers. *Breaks:* never, but depth is a feel decision — one slot holds one intent; a queue holds a combo (5.1's exercise 3).
 
 **Entities and lifetime**
 
@@ -41,13 +42,14 @@ Back in [lesson 2.5](../02-game-dev-foundations/05-architecture-roadmap.md) this
 - **Timer envelopes** — *Reach for:* any fire-and-forget effect (flash, shake, pop). *Breaks:* effects that must *interrupt and blend* (animation canceling in a fighting game) need a real animation state machine.
 - **Edge-trigger latch** — *Reach for:* "once when X becomes true": scoring, triggers, achievements. *Breaks:* never; the failure is forgetting it (counting overlaps instead of crossings — the classic double-score bug).
 - **Puppet AI** — *Reach for:* opponents the player must outplay. *Breaks:* when the AI must *plan* (pathfinding, strategy) — steering is reactive by nature.
+- **Steering behaviors** — *Reach for:* agents with inertia that seek, flee, or flock (boids, the 8.4 predator, homing missiles): desired velocity minus current, clamped, weighted. *Breaks:* when the hard part is *choosing* the goal (pathfinding, planning) — steering only answers "how do I get there smoothly."
 
 **Scale**
 
 - **Rejection sampling** — *Reach for:* "random, but not *there*" in sparse spaces. *Breaks:* as the space fills (a 90%-full board → infinite retries) — switch to collect-and-choose.
 - **Spatial hash grid** — *Reach for:* pairwise local queries over hundreds+ of agents (neighbors, collisions). *Breaks:* hugely varying entity sizes (a battleship and a bullet in one grid) → quadtrees; and non-uniform distributions (everything in one cell → back to O(n²)).
 
-> **🌐 Web dev callout — patterns are vocabulary, not ceremony**
+🌐 **Web dev callout — patterns are vocabulary, not ceremony**
 > If "design patterns" makes you think of `AbstractFactoryFactory` Java jokes, recalibrate: on the web you already say "debounce that handler," "pool those connections," "make it a controlled component" — pattern names as *compression for shared experience*. This guide is the same move for gamedev. The value isn't the code (you wrote all of it already); it's that "spatial hash" now means something to you in a design discussion, a library's docs, or an interview. Nobody should ever implement a pattern from a book — you extract it from a problem you have, then learn its name.
 
 ### Three you didn't need (and what would change that)

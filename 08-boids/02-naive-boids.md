@@ -20,6 +20,10 @@
 
 ## Walkthrough
 
+### First, a deletion: the wander is gone
+
+Lesson 8.1's `WANDER` jitter — the random kick that kept isolated boids drifting — is **removed** in this snapshot, and your diff should delete it too (the constant and the `accel += {...} * WANDER` line). It was a stand-in force for a simulation that only had cohesion: without it, lone boids flew in straight lines forever. With all three rules active, every boid is perpetually steered by *someone* — and on the off chance one truly sees nobody, `clamp_speed`'s near-zero kick from 8.1 still covers the degenerate case. Keep the jitter and the flock works, but the streams look fuzzy; the real rules deserve a clean stage.
+
 ### Perceive: accumulate what the neighbors are doing
 
 All three rules run off a single neighbor scan. Per boid, walk the whole flock, bucket each other boid by distance, and *accumulate* — don't act yet:

@@ -31,7 +31,7 @@ Odin is **ahead-of-time compiled** to machine code — like C, because culturall
 
 Step 1 is important: **if it compiles, entire categories of bugs are already impossible.** There is no `undefined is not a function` at runtime. Misspelled field? Compile error. Wrong argument count? Compile error. Missing import? Compile error. You get TypeScript's strictness — enforced absolutely, with no escape hatches like `any`.
 
-> **🌐 Web dev callout — the toolchain comparison**
+🌐 **Web dev callout — the toolchain comparison**
 >
 > | Web | Odin |
 > |---|---|

@@ -112,7 +112,15 @@ if world.shake > 0 {
 
 `world.shake` decays in the loop (`max(0, world.shake - dt)`), so the jitter dies out over 0.4 s. Random offset scaled by remaining time = a punch that fades.
 
-(Housekeeping: `asteroids_remaining` from 7.3 was used exactly once, so it's inlined as a count loop at the wave check in `main.odin`. One-use procs earn their inline.)
+The camera moves the state machine's draw side around, but it still *switches*: the ship draws inside `BeginMode2D` under `case .Playing` (so it shakes with the world), the GAME OVER text draws under `case .Game_Over` outside it (so it doesn't) — and since that text comes after the HUD lines, "HUD last" strictly holds only in `.Playing`. On the game-over screen the verdict is what sits on top, which is what you want.
+
+(Housekeeping for your diff — 7.3's code shifted in a few places that the features above don't mention:
+
+- `respawn_ship` was also used exactly once, so it's inlined into `collide_ship` next to the death effects (same four assignments: center, zero velocity, angle 0, `invuln`). One-use procs earn their inline — same verdict as `asteroids_remaining`, which became the count loop at the wave check in `main.odin`.
+- `update_bullets` collapsed the death block to a one-liner (`if b.life <= 0 do b.active = false` without the `continue`), so a bullet that dies this frame still gets wrapped once. Harmless — it's inactive, so it never draws — and one branch fewer.
+- `update_particles` runs in `.Game_Over` too, so the nova and the drifting field die out naturally instead of freezing mid-burst.
+- Particles draw **first**, behind rocks, bullets, and ship (sparks read as underlay, not confetti-on-top), and they're hard-coded at radius 2.
+- A batch of 7.3's now-redundant teaching comments was stripped; the code they described is unchanged.)
 
 🌐 **Web dev callout — juice is micro-interactions**
 > Skeleton screens, button press states, hover eases, confetti on the success page: the last 10% that makes software feel *shipped*. Games are nothing but that 10%. And particles are oddly close to CSS animations — fire-and-forget: you spawn them, never reference them again, and they clean themselves up. The discipline difference is ownership: here there's no compositor watching out for you, just a 256-slot array and a loop. If a web page had 350 animated nodes you'd reach for the GPU; here 350 pool slots update in microseconds, because a flat array scan is the fastest "framework" there is.
@@ -135,5 +143,6 @@ The complete game. Thrusting streams a golden trail; rocks burst into orange spa
 2. **Easy:** Tint explosions by tier — BIG `rl.ORANGE`, MED `rl.GOLD`, SMALL `rl.SKYBLUE` — via a `asteroid_color(radius)` sibling to `asteroid_score`. The field becomes readable at a glance.
 3. **Medium:** A high score that survives restarts: on game over, if `score > best`, write it to a file; load it at startup and show `BEST n` on the game-over screen. This is Snake 5.3's exact technique, transplanted.
 4. **Hard:** Engine hum: a 60 Hz, 0.2 s beep looped while UP is held — guard with `if !rl.IsSoundPlaying(hum)` before `rl.PlaySound(hum)` so it never stacks. Then synthesize a second hum 20% higher and switch to it above 200 px/s (`rl.Vector2Length(ship.vel)`). Congratulations, you've invented the rev limiter.
+5. **Easy:** Gamepad support (lesson 2.3's promise): with `rl.IsGamepadAvailable(0)`, rotate with the left stick (`rl.GetGamepadAxisMovement(0, .LEFT_X)`) and thrust with the bottom face button (`.RIGHT_FACE_DOWN`). Asteroids on a controller is a different, better game.
 
 **Next:** [Module 8 — Capstone: Boids 🐦](../08-boids/01-the-flocking-rules.md)

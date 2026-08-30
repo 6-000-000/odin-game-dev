@@ -40,7 +40,7 @@ Nothing you draw persists. Every frame begins with `rl.ClearBackground`, wiping 
 - To hide something, stop drawing it. There's nothing to remove or destroy.
 - Draw order = painter's algorithm: later draws appear on top. Background first, UI last.
 
-> **🌐 Web dev callout — canvas2d, not the DOM**
+🌐 **Web dev callout — canvas2d, not the DOM**
 > This is `<canvas>`'s 2D context model: `clearRect` then redraw. It is *not* the DOM — there's no element tree, no layout engine, no reflow, no CSS. "Layout" is arithmetic you do yourself: `center_x := SCREEN_W/2 - width/2`. The upside: no mystery. The screen shows exactly what your code drew, in the order it drew it, at the coordinates you computed.
 
 ## The shape toolkit
@@ -75,7 +75,7 @@ ghost := rl.Fade(rl.WHITE, 0.5)            // 50% alpha version
 pulse := rl.ColorAlpha(rl.RED, 0.5 + 0.5*math.sin(t*4))
 ```
 
-Alpha (`a`) is opacity: 255 solid, 0 invisible. For per-frame pulsing effects, `rl.Fade`/`rl.ColorAlpha` are your friends — you'll use them for invulnerability blinks in Asteroids.
+Alpha (`a`) is opacity: 255 solid, 0 invisible. For per-frame pulsing effects, `rl.Fade`/`rl.ColorAlpha` are your friends — you'll use them for invulnerability blinks in Asteroids. (`math.sin` needs one new line at the top of the file: `import "core:math"`.)
 
 ## Text that lands where you want it
 
@@ -92,7 +92,7 @@ rl.DrawText(text, (SCREEN_W - w)/2, 200, font_size, rl.WHITE)
 
 ## Full listing
 
-Runnable snapshot: [`code/02-drawing/main.odin`](code/02-drawing/main.odin) — a labeled gallery of every shape above, plus a pulsing circle and centered text. Keep it open in a tab; it's your drawing reference for the whole course.
+Runnable snapshot: [`code/02-drawing/main.odin`](code/02-drawing/main.odin) — a labeled gallery of the course's workhorse shapes, plus a pulsing circle and centered text. Keep it open in a tab; it's your drawing reference for the whole course.
 
 ```sh
 odin run 02-game-dev-foundations/code/02-drawing

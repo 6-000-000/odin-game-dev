@@ -42,8 +42,10 @@ In `main`, the opponent's `↑`/`↓` input lines disappear, replaced by one cal
 
 ```odin
 update_ai(&opponent, ball, dt)
-opponent.pos.y = clamp(opponent.pos.y, PADDLE_H/2, SCREEN_H - PADDLE_H/2)
+opponent.pos.y = clamp(opponent.pos.y, PADDLE_H / 2, SCREEN_H - PADDLE_H / 2)
 ```
+
+Two strings in the draw switch get reworded to match the new opponent — the title prompt becomes `"W/S to move — beat the AI to 10 — SPACE to start"` and the winner line becomes `player.score > opponent.score ? "YOU WIN!" : "AI WINS!"`. Cosmetic, but the snapshot has them, so your diff should too.
 
 ### Sounds: three synthesized beeps
 
@@ -59,7 +61,7 @@ defer rl.UnloadSound(hit_sfx)
 rl.PlaySound(hit_sfx)   // on paddle collision
 ```
 
-Copy the `make_beep` block verbatim from the snapshot. The three `rl.PlaySound` calls slot into blocks you already have: `hit_sfx` inside the paddle-collision `if`, `wall_sfx` (220 Hz, 0.06 s) inside both wall-bounce `if`s, `score_sfx` (660 Hz, 0.2 s) inside both out-of-bounds `if`s. From now on, "add a beep for X" is a two-minute task in any project — placeholder audio is a superpower because sound feedback changes how a game *feels to develop*, not just to play.
+Copy the audio machinery verbatim from the snapshot — that's **four** pieces, all under the `// --- audio ---` banner plus one constant: `SAMPLE_RATE :: 22050` (up in the constants block), the `append_u16le`/`append_u32le` byte helpers, and `make_beep` itself. Copy only the proc and you'll get compile errors for the other three. The three `rl.PlaySound` calls slot into blocks you already have: `hit_sfx` inside the paddle-collision `if`, `wall_sfx` (220 Hz, 0.06 s) inside both wall-bounce `if`s, `score_sfx` (660 Hz, 0.2 s) inside both out-of-bounds `if`s. From now on, "add a beep for X" is a two-minute task in any project — placeholder audio is a superpower because sound feedback changes how a game *feels to develop*, not just to play.
 
 ### Particles on impact
 
@@ -84,7 +86,16 @@ spawn_particles :: proc(particles: ^[dynamic]Particle, pos, base_vel: rl.Vector2
 }
 ```
 
-Each particle inherits 30% of the ball's velocity plus a random radial burst — they spray *away* from the impact direction, which reads as "impact" to the eye. The update loop ages them and removes the dead:
+Each particle inherits 30% of the ball's velocity plus a random radial burst. One honest detail: the spawn call is `spawn_particles(&particles, ball.pos, ball.vel)` placed *before* `ball.vel.x` flips, so the inherited 30% points along the incoming direction, not the rebound. It doesn't matter — the 60–220 px/s radial burst dwarfs the ~100 px/s bias, and the eye reads "impact" either way. (Swap the call to after the flip if you prefer the spray to follow the rebound.)
+
+Declare the pool in `main`, next to the other game state — a dynamic array with the usual cleanup:
+
+```odin
+particles: [dynamic]Particle
+defer delete(particles)
+```
+
+The update loop ages them and removes the dead:
 
 ```odin
 for i := len(particles) - 1; i >= 0; i -= 1 {
@@ -95,7 +106,7 @@ for i := len(particles) - 1; i >= 0; i -= 1 {
 }
 ```
 
-**Iterate backward when removing** (lesson 1.3's trick): `unordered_remove` swaps the last element into slot `i`; iterating forward would skip it. Backward iteration makes removal safe and branch-free.
+**Iterate backward when removing.** Lesson 1.3 gave you `unordered_remove` — it swaps the last element into slot `i`, so a forward loop would skip that element. Iterating backward is the other half of the idiom: removal becomes safe and branch-free.
 
 One placement detail: that update loop sits *outside* the state `switch` — particles keep drifting and fading on the title and game-over screens, so the menus never look frozen. Drawing is one loop, with alpha tied to remaining life:
 

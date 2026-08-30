@@ -38,7 +38,7 @@ defer rl.UnloadTexture(texture2)
 
 An `Image` is CPU-side pixels (you can draw into it, recolor it, resize it). `LoadTextureFromImage` uploads to the GPU as a `Texture2D`; the `Image` can then be freed. Sounds follow the same shape: `LoadSound`/`UnloadSound`, `LoadMusicStream`/`UnloadMusicStream`.
 
-> **🌐 Web dev callout — GPU memory is a manual cache**
+🌐 **Web dev callout — GPU memory is a manual cache**
 > Think of `Texture2D` like a decoded image the browser holds for `<img>`, except *you* own its lifetime. Forgetting `UnloadTexture` leaks GPU memory exactly like forgetting `URL.revokeObjectURL` leaks blobs — the tracking allocator won't catch this one (it's raylib's memory, not Odin's), so the `defer` habit matters.
 
 ## Drawing textures: from simple to full control
@@ -100,6 +100,8 @@ raylib can load a WAV from a memory buffer (`rl.LoadWaveFromMemory`). A WAV file
 ```odin
 sample := i16(math.sin(2 * math.PI * frequency * t) * 12000 * envelope)
 ```
+
+(The trig needs one new line at the top of the file: `import "core:math"`.)
 
 The full listing below contains a reusable `make_beep(frequency, duration)` proc. Drop it into any project to get placeholder audio with zero asset files — real games later swap in `.wav` files from a pack like [kenney.nl](https://kenney.nl) (free, excellent).
 

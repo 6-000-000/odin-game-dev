@@ -23,11 +23,11 @@
 
 ### The real bottleneck
 
-Your 8.3 boids sim runs 5,000 boids by checking ~9 grid cells per boid. The flocking math is a few dozen FLOPs per neighbor — trivial for a CPU that does billions per second. So where does the time go? **Memory.** Every `boids[j]` fetch is a pointer chase into RAM, and RAM is *slow* relative to the CPU: a cache miss costs as much as a few hundred arithmetic ops.
+Your 8.3 boids sim runs 5,000 boids by checking ~9 grid cells per boid. (8.3, deliberately not 8.4: the camera, predator, and sliders are interaction chrome — what we're measuring is the flock step, so the snapshot rewinds to the clean 8.3 sim as the control group.) The flocking math is a few dozen FLOPs per neighbor — trivial for a CPU that does billions per second. So where does the time go? **Memory.** Every `boids[j]` fetch is a pointer chase into RAM, and RAM is *slow* relative to the CPU: a cache miss costs as much as a few hundred arithmetic ops.
 
 Here's the part nobody tells web devs: the CPU never fetches one byte. It fetches a **cache line — 64 bytes** — the byte you asked for plus its 63 neighbors, on the bet that you'll need them next. If your data is arranged so neighbors *are* what you need next, every fetch is free. If not, you pay a miss per element.
 
-> **🌐 Web dev callout — row store vs column store**
+🌐 **Web dev callout — row store vs column store**
 > You've met this exact tradeoff in databases. PostgreSQL is a **row store**: a row's columns sit together, so `SELECT *` by id is one page read — but `AVG(price)` over a million rows drags every *entire row* through memory just to read one column. ClickHouse/Parquet are **column stores**: each column is contiguous, so aggregate scans read only the columns they need and absolutely fly — while "give me whole row 42" becomes a scattered mess. Same data, different layout, different queries win. AoS is the row store (great when you touch all of an entity's fields at once); SoA is the column store (great when you sweep one field across many entities). And just like databases: **the access pattern decides, not fashion.**
 
 ### The three layouts, concretely
@@ -84,7 +84,9 @@ copy_aos_to_soa :: proc(dst: ^#soa[dynamic]Boid, src: []Boid) {
 }
 ```
 
-The HUD shows the current layout, its `update` ms, and the last-measured ms of *both* layouts. Run it:
+(Its mirror `copy_soa_to_aos` is the same loop in the other direction — resize `boids_aos` to `len(src)`, assign element by element. TAB calls whichever matches the direction, so the flock never loses a beat.)
+
+The HUD shows the current layout, its `update` ms, and the last-measured ms of *both* layouts. Know exactly what that `update` number is before you trust it: a **single-frame** sample — `rl.GetTime()` bracketing the grid rebuild *and* the flock step — with no averaging and no warmup. It will jitter frame to frame (OS scheduling, cache state), so read the *typical* value over a few seconds, not any one frame. And the 1/2/3 keys respawn **only the active layout**; the other rebuilds from it on TAB. That's what keeps both worlds identical for comparison (the seed resets on every respawn for the same reason). Run it:
 
 ```sh
 odin run 09-game-architecture/code/02-aos-vs-soa -o:speed
@@ -97,7 +99,7 @@ Press 3 (5,000 boids), let it settle, and TAB back and forth. On most machines t
 
 So when does layout actually matter? **When structs get fat or loops get selective.** If `Boid` also carried `color`, `spin`, `health`, a name string (say 64 bytes/boid), the AoS flock step would drag 4× the memory for the same two hot fields, while SoA streams exactly `pos` and `vel`. Same math, 4× the memory traffic — that's when SoA pulls away hard. Layout follows access patterns: profile first, lay out second.
 
-This is also why 8.3's *grid* was the bigger win: it cut the *number* of fetches (algorithmic, ~100×), while layout optimizes the *cost* per fetch (constant factor, ~2–5×). **Algorithm first, layout second, micro-optimizations last** — in that order, always.
+This is also why 8.3's *grid* was the bigger win: it cut the *number* of fetches (algorithmic, ~18×), while layout optimizes the *cost* per fetch (constant factor, ~2–5×). **Algorithm first, layout second, micro-optimizations last** — in that order, always.
 
 ## Full listing
 
@@ -116,7 +118,7 @@ odin run 09-game-architecture/code/02-aos-vs-soa -o:speed
 ## Exercises
 
 1. **Easy:** Note `update` ms at 500/2000/5000 in both layouts. Is SoA ever *slower*? Why might it be? (Hint: the neighbor loop now chases two streams — `pos[j]` and `vel[j]` — instead of one interleaved block.)
-2. **Medium:** Add `padding: [6]rl.Vector2` (96 cold bytes) to `Boid` — don't touch it anywhere. Re-measure both layouts at 5,000. Watch AoS fall off a cliff while SoA barely moves. You just manufactured the conditions where layout is *the* optimization.
+2. **Medium:** Add `padding: [6]rl.Vector2` (48 cold bytes) to `Boid` — don't touch it anywhere. Re-measure both layouts at 5,000. Watch AoS fall off a cliff while SoA barely moves. You just manufactured the conditions where layout is *the* optimization.
 3. **Medium:** The grid rebuild only reads positions. Time `grid_rebuild_aos` vs `grid_rebuild_soa` separately at 5,000 with the fat struct from exercise 2 — the column-stream version should now win clearly. This is the "hot loop touches one cold-struct field" case in its purest form.
 4. **Hard:** Convert Asteroids' particle pool to `#soa` (particles are updated every frame but drawn from only `pos`+`life`). Measure with 10,000 particles. Decide, with numbers, whether the conversion was worth keeping.
 

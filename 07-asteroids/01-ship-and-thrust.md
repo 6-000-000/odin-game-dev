@@ -31,6 +31,8 @@ Ship :: struct {
 }
 ```
 
+The window is 900×600 this project, the feel constants are `ROT_SPEED :: 220` (°/s), `THRUST :: 300` (px/s²), `DAMPING :: 0.8` (fraction/s), and the ship spawns centered with `radius = 16`.
+
 We keep `angle` in **degrees** because humans (and raylib's polygon drawing) think in degrees. The trig in `core:math` thinks in radians. The conversion lives in exactly one place:
 
 ```odin
@@ -40,7 +42,17 @@ ship_facing :: proc(angle: f32) -> rl.Vector2 {
 }
 ```
 
-Why the `- 90`? `{cos 0, sin 0}` is `{1, 0}` — pointing **right**. And because screen y points *down* (lesson 2.2), angle 90° in screen space is straight *down*. Shifting the circle by −90° puts angle 0 where the player expects it: up the screen. Every point on the ship's body goes through the same helper (`ship_point`), so there is one place to get this right and zero places to get it wrong.
+Why the `- 90`? `{cos 0, sin 0}` is `{1, 0}` — pointing **right**. And because screen y points *down* (lesson 2.2), angle 90° in screen space is straight *down*. Shifting the circle by −90° puts angle 0 where the player expects it: up the screen. Every point on the ship's body goes through the same helper — `ship_point`, the same −90° math generalized to any angle and distance:
+
+```odin
+// A point on the ship's body: `deg` degrees around, `dist` px out from center.
+ship_point :: proc(pos: rl.Vector2, deg, dist: f32) -> rl.Vector2 {
+	rad := (deg - 90) * rl.DEG2RAD
+	return pos + {math.cos(rad), math.sin(rad)} * dist
+}
+```
+
+One place to get the convention right, zero places to get it wrong.
 
 ### Rotate, thrust, damp, integrate
 
@@ -98,7 +110,7 @@ base_r := ship_point(ship.pos, ship.angle - 160, ship.radius * 0.5)
 rl.DrawTriangle(base_l, tip, base_r, rl.ORANGE)
 ```
 
-The flame tip's length is re-randomized **every frame** — 60 random lengths a second reads as flicker. It's the cheapest animation technique that exists, and you'll keep using it (the boids capstone uses it for a predator's pulse).
+The flame tip's length is re-randomized **every frame** — 60 random lengths a second reads as flicker. It's the cheapest animation technique that exists, and you'll keep using it: lesson 7.4's screen shake is the same trick — a fresh random offset every frame — scaled up to the whole screen.
 
 🌐 **Web dev callout — velocity + damping is inertia scrolling**
 > If you've ever built momentum scrolling or a springy drag in a `requestAnimationFrame` loop — track velocity on pointermove, keep integrating after release, multiply by 0.95 each frame until it dies — you have written this exact integrator. Games just never stop the loop. The discipline that differs: never assume 60 fps. `vel *= 0.95` means "keep 95% per *frame*", which is a different friction at 144 Hz than at 30 Hz. `vel *= 1 - DAMPING * dt` is the linear fix; the exercises make it exact with `math.pow`.
@@ -121,5 +133,6 @@ A white wireframe dart sits center-screen. LEFT/RIGHT spin it in place at 220°/
 2. **Easy:** Find a feel. Try `THRUST 600 / DAMPING 0.2` (ice rink) and `THRUST 300 / DAMPING 3.0` (molasses). Keep your favorite and write one comment line defending the choice.
 3. **Medium:** Make damping exactly frame-rate independent: replace `vel *= 1 - DAMPING * dt` with `vel *= math.pow(1 - DAMPING, dt)` ("keep (1−D) of velocity *per second*, raised to the dt power"). Run both versions at `rl.SetTargetFPS(30)` and `rl.SetTargetFPS(144)` and compare how far the ship drifts after a fixed thrust burst.
 4. **Medium:** Brakes: while DOWN is held, apply `ship.vel *= 1 - 4 * dt`. Explain (in a comment) why this feels better than `ship.vel = {}` — and which of the two can leave a tiny, never-quite-zero residual velocity.
+5. **Hard:** Orbit autopilot: write a controller that steers the ship into a closed loop around the screen center — rotate toward the tangent (`ship_facing` perpendicular to the radius vector), thrust only while speed is below 200, and watch it settle into something eerily physical. Orbits are made of *velocity management*, not position correction — feel why in your hands first, then in the code.
 
 **Next:** [7.2 The entity pool](02-entity-pool.md)

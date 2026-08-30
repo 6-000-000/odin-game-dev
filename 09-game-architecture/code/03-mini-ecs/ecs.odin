@@ -4,7 +4,7 @@ import "core:math"
 import rl "vendor:raylib"
 
 // =============================================================================
-// A mini Entity-Component-System in ~150 lines.
+// A mini Entity-Component-System in ~180 lines.
 //
 //   Entity    = a handle (index + generation), not a pointer.
 //   Component = a column in the World + a bit in each entity's mask.

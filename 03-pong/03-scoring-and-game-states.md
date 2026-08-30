@@ -76,6 +76,12 @@ ball_serve_vel :: proc(toward_left: bool) -> rl.Vector2 {
 }
 ```
 
+The signature change breaks the one existing call site — the initialization in `main`. Update it too (it serves left, toward the player, purely so the human gets the first ball):
+
+```odin
+ball := Ball{pos = {SCREEN_W / 2, SCREEN_H / 2}, vel = ball_serve_vel(true)}
+```
+
 🌐 **Web dev callout — it's a reducer with a render function**
 > This is the `useReducer` pattern you already know: a finite set of states, explicit transitions triggered by events (key presses, scores), and UI as a pure function of state. The difference: no library, no dispatch — just a `switch` that runs 60 times a second. Games lean on this pattern *constantly*: menus, pause, cutscenes, boss phases. When a game dev says "state machine", they mean exactly this enum+switch, not a framework.
 
@@ -86,7 +92,7 @@ The ball crossing the left edge scores for the opponent (and vice versa). The se
 ```odin
 if ball.pos.x < -BALL_RADIUS {
 	opponent.score += 1
-	ball.pos = {SCREEN_W/2, SCREEN_H/2}
+	ball.pos = {SCREEN_W / 2, SCREEN_H / 2}
 	ball.vel = ball_serve_vel(true)   // serve left, toward the player
 }
 ```
@@ -100,8 +106,8 @@ The right edge is the mirror image: `ball.pos.x > SCREEN_W + BALL_RADIUS` scores
 Scores draw on top of everything, flanking the center line:
 
 ```odin
-rl.DrawText(rl.TextFormat("%d", player.score), SCREEN_W/2 - 80, 20, 60, rl.WHITE)
-rl.DrawText(rl.TextFormat("%d", opponent.score), SCREEN_W/2 + 50, 20, 60, rl.WHITE)
+rl.DrawText(rl.TextFormat("%d", player.score), SCREEN_W / 2 - 80, 20, 60, rl.WHITE)
+rl.DrawText(rl.TextFormat("%d", opponent.score), SCREEN_W / 2 + 50, 20, 60, rl.WHITE)
 ```
 
 And two small helpers carry the whole UI. The dashed center line (lesson 3.1's exercise, answered):
@@ -161,5 +167,6 @@ Title screen ("PONG — first to 10 — SPACE to start"), a playable rallying ga
 2. **Easy:** Add a pause state (`.Paused`) entered with P from `.Playing`, showing a dimmed overlay (fullscreen rect with `rl.Fade(rl.BLACK, 0.5)`) and "PAUSED". P resumes. (Steal `rl.SetExitKey(.KEY_NULL)` from lesson 2.3 if you want ESC instead.)
 3. **Medium:** Add a brief "3, 2, 1" countdown state between Title and Playing using a `countdown: f32` timer decremented by dt, drawing `int(countdown)+1` while it's above 0.
 4. **Medium:** Track rally length (paddle hits this point) and flash it center-screen when it exceeds 10 — "RALLY x12!". Data lives in a variable that resets on every score.
+5. **Hard:** Attract mode: when the title screen sits idle for 5 s (`idle_timer`), start a demo match with *both* paddles running a simple "move toward ball.y" tracker; any keypress returns to the title. You'll need a fourth state — notice how the enum + two switches absorb it without surgery. Every arcade cabinet does this; it's why they look alive in the store.
 
 **Next:** [3.4 Polish: AI, sound, and juice](04-polish.md)

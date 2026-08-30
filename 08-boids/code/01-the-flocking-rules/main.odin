@@ -8,7 +8,7 @@ SCREEN_W :: 1280
 SCREEN_H :: 720
 
 BOID_COUNT :: 20
-BOID_SIZE :: 9 // px from center to nose
+BOID_SIZE :: 8 // px from center to nose
 WANDER :: 0.05 // fraction of max_steer applied as random jitter
 
 Boid :: struct {

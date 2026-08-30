@@ -57,7 +57,7 @@ Eight structs on the stack, declared once before the loop. Odin zero-initializes
 
 ```odin
 // Find the first inactive slot and reuse it. If the pool is full, drop the
-// spawn — with these constants at most 4 pipes are ever on screen at once.
+// spawn — with these constants at most 3 pipes are ever on screen at once.
 spawn_pipe :: proc(pipes: ^[MAX_PIPES]Pipe) {
 	for &p in pipes {
 		if !p.active {
@@ -72,7 +72,7 @@ spawn_pipe :: proc(pipes: ^[MAX_PIPES]Pipe) {
 }
 ```
 
-Spawning is a linear scan for the first inactive slot, a field-by-field reset, and an early `return`. If no slot is free, the spawn is silently dropped — with a 1.4 s interval at 180 px/s, at most 4 pipes exist at once, so 8 slots can't fill. The new pipe appears at `SCREEN_W + 40`: fully off the right edge, so it slides into view instead of popping in. Note the parameter type `^[MAX_PIPES]Pipe` — a pointer to the whole array, so `spawn_pipe(&pipes)` mutates the caller's pool, and `for &p in pipes` iterates by reference so the writes land in the slots themselves.
+Spawning is a linear scan for the first inactive slot, a field-by-field reset, and an early `return`. If no slot is free, the spawn is silently dropped — and that can't happen here: a pipe lives `(520 + 70) px ÷ 180 px/s ≈ 3.3 s` (spawn at `SCREEN_W + 40`, retire at `-PIPE_W`), spawns arrive 1.4 s apart, so at most **3** pipes are ever live, and 8 slots can't fill. The new pipe appears at `SCREEN_W + 40`: fully off the right edge, so it slides into view instead of popping in. Note the parameter type `^[MAX_PIPES]Pipe` — a pointer to the whole array, so `spawn_pipe(&pipes)` mutates the caller's pool, and `for &p in pipes` iterates by reference so the writes land in the slots themselves.
 
 ### Random, but safe
 
@@ -102,6 +102,8 @@ for &p in pipes {
 
 Two small machines run every Playing frame. The timer counts down from `SPAWN_INTERVAL` (1.4 s) and fires `spawn_pipe` each time it laps. Below it, the loop scrolls every live pipe left and retires any pipe whose right edge has cleared the left edge of the screen (`x < -PIPE_W`) — that slot is immediately available for the next spawn. The pool breathes: pipes activate at the right edge, retire at the left, and the same eight slots serve the whole run. Restart is the same trick in bulk: `for &p in pipes do p.active = false` clears the world in one line.
 
+One detail on the timer's starting value: it's declared as `spawn_timer := f32(1)`, not `SPAWN_INTERVAL` — the first pipe arrives 1.0 s after the run starts (and the restart sets `spawn_timer = 1` too), so the player gets a beat to find the rhythm before the first obstacle. Waiting the full 1.4 s makes the opening feel broken; starting at 0 spawns a pipe on frame one.
+
 ### Two rects and a lip
 
 ```odin
@@ -117,6 +119,10 @@ draw_pipe :: proc(p: Pipe) {
 ```
 
 A pipe is two rectangles meeting at the gap: the top one hangs from y = 0 down to the gap's top edge, the bottom one stands from the gap's bottom edge to `GROUND_TOP`. The darker "lip" rectangles are 6 px wider than the pipe (3 px of overhang per side) and cap the mouths of the gap — pure decoration, but it's what makes a green rectangle read as a *pipe*. The bottom rect stops exactly at `GROUND_TOP` and the ground strip is drawn right after, so the junction is seamless.
+
+The draw loop that calls this iterates **by value** — `for p in pipes` — because drawing only reads. Contrast with the update loop's `for &p`, which mutates. Pick per loop: `&` when you write, plain when you read.
+
+(Heads-up for your diff: from this snapshot on, each lesson's listing trims the previous lesson's now-redundant teaching comments — 6.1's `// impulse: SET the velocity…` and friends are gone here. The code they described is unchanged.)
 
 🌐 **Web dev callout — pooling is how you never feed the GC**
 > You've hit this on the web: a particle effect or a canvas animation stutters, and the profiler shows GC pauses from thousands of short-lived objects. The fix there is the fix here — keep a fixed set of objects alive forever and recycle them (three.js devs pool their `Vector3`s for exactly this reason). In JS, pooling is an optimization you reach for *after* the garbage collector embarrasses you, because the language will happily collect whatever you drop. Odin has no GC at all: without a pool you'd be calling `make`/`delete` by hand and leaking when you forgot. The pool isn't a performance hack — it's just what "manage your own memory" looks like when entities are born and die every second. The `active` flag is the whole lifecycle — constructor, destructor, and collector in one boolean.
@@ -138,6 +144,7 @@ Flap to start: a pipe slides in from the right every 1.4 seconds, gap heights va
 1. **Easy:** Set `MAX_PIPES :: 2` and re-run. The obstacle stream develops holes — the spawner drops spawns when the pool is full, *silently*. A pool that's too small doesn't crash, it fails quietly, which is worse. Restore the 8.
 2. **Easy:** Paint the corridor you're aiming for: in `draw_pipe`, add `rl.DrawRectangleV({p.x, p.gap_y - p.gap_h / 2}, {PIPE_W, p.gap_h}, rl.Fade(rl.RED, 0.3))`. Play a round with the gap filled in, then delete it.
 3. **Medium:** Break the metronome. After each spawn, set `spawn_timer = SPAWN_INTERVAL * rand.float32_range(0.85, 1.15)` instead of the flat constant. Same average spacing, unpredictable rhythm — Flappy's rhythm-game feel comes precisely from the flat interval.
-4. **Medium:** Watch the pool breathe. Each frame, count the active pipes into an `active_count` and draw it with `draw_centered(rl.TextFormat("pipes %d", active_count), 8, 20, rl.WHITE)`. Confirm it never exceeds 4 — then set `SPAWN_INTERVAL :: 0.5` and watch the cap get tested.
+4. **Medium:** Watch the pool breathe. Each frame, count the active pipes into an `active_count` and draw it with `draw_centered(rl.TextFormat("pipes %d", active_count), 8, 20, rl.WHITE)`. Confirm it never exceeds 3 — then set `SPAWN_INTERVAL :: 0.5` and watch the cap get tested.
+5. **Hard:** Ramp the difficulty without new constants: make the interval a variable that shrinks from 1.4 s to 0.9 s over the first minute (`interval = max(0.9, interval - 0.01 * dt)`… per frame). Then redo the lifetime math from this lesson (590 px ÷ 180 px/s ≈ 3.3 s) against the 0.9 s floor and *prove* the 8-slot pool still can't fill. Difficulty curves that outrun their pools fail silently — exercise 1 showed you how.
 
 **Next:** [6.3 Collisions and score](03-collisions-and-score.md)

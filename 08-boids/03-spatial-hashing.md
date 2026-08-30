@@ -19,7 +19,7 @@
 | Counting sort | Count → prefix-sum → scatter: sorts boids by cell in O(n), no comparisons |
 | Prefix sum | `cell_start[i]` = index where cell *i*'s boids begin in the flat array |
 | Multi-file package | `main.odin` / `boids.odin` / `grid.odin` share `package main` — no imports between them |
-| `-o:speed` | Release build: debug builds of this sim are ~10× slower |
+| `-o:speed` | Release build: debug builds of this sim run ~3–6× slower (bounds checks, no inlining) |
 
 ## Walkthrough
 
@@ -35,8 +35,8 @@ cell size = perception radius (75 px)
 │     │ ·   │  ·  │     │   boid ● lives in one cell
 ├─────┼──●──┼─────┼─────┤   neighbors can only be in the
 │     │ · · │  ·  │     │   3×3 cells around it (shaded)
-├─────┼─────┼─────┼─────┤   → scan ~30 candidates, not 2,000
-└─────┴─────┴─────┴─────┘
+├─────┼─────┼─────┼─────┤   → scan ~30 candidates (500 boids),
+└─────┴─────┴─────┴─────┘     ~110 at 2,000 — never the whole flock
 ```
 
 Why must `cell_size` equal the perception radius? A boid can see up to 75 px in any direction. If cells are 75 px wide, then *anything* within 75 px is guaranteed to be in the boid's cell or an adjacent one — the 3×3 block is a superset of the vision circle. Smaller cells would miss neighbors; larger cells would scan more dead space. Exact fit.
@@ -75,7 +75,26 @@ grid_rebuild :: proc(grid: ^Grid, boids: []Boid) {
 
 Walk the tiny example in the code comment: boids `[0 1 2 3 4]` live in cells `[1 0 1 2 1]`. Counts are `[1 3 1]`; prefix sums give starts `[0 1 4]`; the fill pass scatters indices into runs — cell 1 owns `cell_boids[1..<4]` = boids `{0, 2, 4}`. After the rebuild, *"the boids in cell c"* is the slice `cell_boids[start[c] ..< start[c]+count[c]]`. No map, no pointers, no allocation — three linear passes.
 
-The arrays come from `grid_init` with `make([dynamic]int, ...)` + `defer grid_destroy(&grid)`: `cell_count`, `cell_start`, `cursor` sized `cells_x * cells_y` (18×10 = 180 on our screen), `cell_boids` sized `MAX_BOIDS`. Allocation happens at startup, never in the loop.
+The `Grid` struct bundles the dimensions with the four arrays — and `grid_cell` is the position→cell-index function both the rebuild and the query clamp through (positions must clamp, not wrap: a boid at the right edge belongs to the last column, not column 18):
+
+```odin
+Grid :: struct {
+	cells_x, cells_y: int,
+	cell_size:      f32, // MUST equal Settings.perception_radius
+	cell_count:     [dynamic]int, // boids per cell              (len cells_x*cells_y)
+	cell_start:     [dynamic]int, // where each cell's run begins (len cells_x*cells_y)
+	cell_boids:     [dynamic]int, // boid indices, sorted by cell  (len max_boids)
+	cursor:         [dynamic]int, // fill-pass scratch           (len cells_x*cells_y)
+}
+
+grid_cell :: proc(grid: ^Grid, pos: rl.Vector2) -> int {
+	cx := clamp(int(pos.x / grid.cell_size), 0, grid.cells_x - 1)
+	cy := clamp(int(pos.y / grid.cell_size), 0, grid.cells_y - 1)
+	return cy * grid.cells_x + cx
+}
+```
+
+The arrays come from `grid_init` with `make([dynamic]int, ...)` + `defer grid_destroy(&grid)`: `cell_count`, `cell_start`, `cursor` sized `cells_x * cells_y`, `cell_boids` sized `MAX_BOIDS`. The dimensions round **up** — `cells_x = (world_w + cell_size - 1) / cell_size` — so 1280×720 at `CELL_SIZE :: 75` yields 18×10 = 180 cells, with a thin partial cell at the right and bottom edges. Allocation happens at startup, never in the loop.
 
 ### `boids.odin`: same flock, new neighbor source
 
@@ -104,6 +123,8 @@ for dy in -1 ..= 1 {
 
 The `(x + cells_x) % cells_x` wrap makes the 3×3 scan toroidal: a boid in the rightmost column scans the leftmost column, where — thanks to our wrap-aware `offset()` helper — it genuinely finds the boids sitting just across the seam. Everything below the scan (the `sep`/`align_sum`/`coh_sum` accumulators, the three `steer_toward` calls, the clamp-integrate-wrap tail) is byte-for-byte lesson 8.2. **The optimization changed the data structure, not the algorithm** — same rules, same weights, same flock behavior, radically fewer pair checks.
 
+(One latent edge case for porters: the modulo wrap double-visits cells if a grid dimension ever drops below 3 — a 2-cell-wide world scans the same column three times and counts those neighbors thrice. Unreachable here — even exercise 3's grid is 9×5 — but if you reuse this code on a tiny world, guard it.)
+
 ### `main.odin`: presets and honesty about build modes
 
 Preallocate the boid array once at max capacity, then let keys switch presets. Note the container: `[dynamic]Boid` — every boid's fields sit adjacent in memory, one boid after another. That's an *Array of Structs*, and it's quietly been the layout of every entity array in the course. Lesson 9.2 converts this very sim to the dual layout (Struct of Arrays, one keyword in Odin) and measures the difference:
@@ -126,12 +147,12 @@ Measured on one machine (update only, `update_ms` is rebuild + flock step — *m
 |---|---|---|---|
 | naïve (8.2) | 150 | ~0.4 ms | ~0.1 ms |
 | naïve (8.2) | 400 | ~2.5 ms | ~0.4 ms |
-| naïve (8.2) | 2,000 | ~62 ms (16 fps) | ~11 ms |
+| naïve (8.2) | 2,000 | ~60 ms (16 fps) | ~11 ms |
 | **grid (8.3)** | 500 | ~0.7 ms | ~0.2 ms |
 | **grid (8.3)** | 2,000 | ~8 ms | ~3 ms |
 | **grid (8.3)** | 5,000 | ~46 ms | ~15 ms |
 
-Two lessons in that table. First, the algorithmic win: the grid does 2,000 boids cheaper than the naïve loop does 400 — and at 5,000 boids it's still ~13× fewer pair checks than naïve-at-2,000 would need (naïve 5,000 would be ~25M checks/frame; it doesn't fit in the table because it doesn't fit in a frame). Second: **debug builds are slow**. Odin's default build keeps bounds checks and no inlining; for this sim it's ~6–10× slower. Whenever you're measuring or showing off, ship `-o:speed`:
+Two lessons in that table. First, the algorithmic win: the grid does 2,000 boids cheaper than the naïve loop does 400 — and at 5,000 boids it's ~18× fewer pair checks than naïve-at-5,000 would need (~1.4M vs ~25M per frame, at uniform density; flocking clusters boids, so your measured ratio will be lower — that's exercise 1). Naïve 5,000 doesn't fit in the table because it doesn't fit in a frame. Second: **debug builds are slow**. Odin's default build keeps bounds checks and no inlining; for this sim it's ~3–6× slower (read the ratios straight off the table). Whenever you're measuring or showing off, ship `-o:speed`:
 
 ```sh
 odin run 08-boids/code/03-spatial-hashing -o:speed
@@ -151,11 +172,11 @@ odin run 08-boids/code/03-spatial-hashing -o:speed   # for real measurements
 
 ## Checkpoint
 
-2,000 boids flock smoothly — rivers of triangles that braid, split at the seams, and rejoin. Keys 1/2/3 respawn 500 / 2,000 / 5,000 boids, and `update` stays in single-digit milliseconds where lesson 8.2's naïve loop needed ~62 ms for 2,000. Behavior should look *identical* to 8.2 — if the flock acts differently, the bug is in the query, not the rules.
+2,000 boids flock smoothly — rivers of triangles that braid, split at the seams, and rejoin. Keys 1/2/3 respawn 500 / 2,000 / 5,000 boids, and `update` stays in single-digit milliseconds where lesson 8.2's naïve loop needed ~60 ms for 2,000. Behavior should look *identical* to 8.2 — if the flock acts differently, the bug is in the query, not the rules.
 
 ## Exercises
 
-1. **Easy:** Count candidates scanned per frame (increment a counter in the innermost loop) and print `candidates / boids` — the average neighborhood size. Compare with the naïve loop's fixed `n − 1`. At 2,000 boids you should see ~100× fewer checks.
+1. **Easy:** Count candidates scanned per frame (increment a counter in the innermost loop) and print `candidates / boids` — the average neighborhood size. Compare with the naïve loop's fixed `n − 1`. At 2,000 boids spread evenly you'd see ~18× fewer checks (1,999 vs ~110 per boid); a clumped flock shows less. Measuring the real number *is* the exercise.
 2. **Medium:** Debug view: draw the grid lines (`DrawLine` every `cell_size`) and highlight the 3×3 cells around the boid nearest the mouse. Watching the shaded block follow the boid makes the query click.
 3. **Medium:** Cell-size experiment: rebuild the grid with `CELL_SIZE` = 37 (half perception) and 150 (double). One misses neighbors (broken flocking — why?), the other scans more dead space (slower — measure it). This is why cell = perception radius.
 4. **Hard:** Remove the square roots: compare `Vector2LengthSqr(to_other)` against `d*d` precomputed from the radii, and compare `sep`/`coh` math accordingly (careful: `coh_sum/count` still needs real vectors — only the *distance tests* change). Measure the difference at 5,000 boids. Then look at `update_boids` and decide if the readability cost was worth it.

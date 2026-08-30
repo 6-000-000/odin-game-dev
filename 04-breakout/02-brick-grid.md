@@ -116,7 +116,7 @@ brick_hit: for row in 0 ..< BRICK_ROWS {
 - Axis flips preserve speed in exact math — but floats aren't exact, and corner grazes compound tiny errors. `Vector2Normalize(vel) * BALL_SPEED` pins the speed after every brick bounce: cheap insurance for the constant-speed physics from lesson 4.1.
 - `b := &bricks[row][col]` takes a pointer so `b.alive = false` writes into the grid, not a copy.
 
-The HUD is one line — drawn last, so it sits on top:
+The counter itself starts at full — `bricks_left := BRICK_ROWS * BRICK_COLS`, declared in `main` next to the grid. The HUD is one line — drawn last, so it sits on top:
 
 ```odin
 rl.DrawText(rl.TextFormat("bricks: %d", bricks_left), 20, 20, 20, rl.GRAY)
@@ -143,5 +143,6 @@ Six colored rows of bricks across the top and a brick counter in the corner. The
 2. **Easy:** Give each row a point value (top row 50, down to 10 for the bottom) and show a score next to the brick count.
 3. **Medium:** Comment out the `break brick_hit` and play. Explain the tunnels the ball digs: why does resolving two bricks in one frame look like passing through solid ones?
 4. **Medium:** Multi-hit bricks: add `hp: int` to `Brick` (2 for the top two rows, 1 otherwise), decrement instead of killing, and draw damaged bricks with `rl.Fade(b.color, 0.5)`. Lesson 4.3's level format will want this.
+5. **Hard:** Tunnel insurance: a fast enough ball skips clean over a brick between frames. Subdivide the per-frame motion into steps of at most `BALL_RADIUS` px — `steps := 1 + int(rl.Vector2Length(ball.vel) * dt / BALL_RADIUS)` — moving and checking collisions per sub-step. Then raise `BALL_SPEED` until the unsubdivided version visibly tunnels, and note the crossover. (This is the cheap ancestor of continuous collision detection.)
 
 **Next:** [4.3 Lives, levels, and level data](03-lives-and-levels.md)

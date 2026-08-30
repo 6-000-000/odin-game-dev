@@ -36,6 +36,27 @@ Game_State :: enum {
 
 `.Title` resets everything and starts; `.Game_Over` and `.Win` wait for SPACE and go back to the title. All the gameplay from lesson 4.2 moves under `case .Playing:` untouched.
 
+The draw switch is new in this module, so here it is in full. It leans on `draw_centered` — Pong 3.3's `MeasureText` helper, ported verbatim — which also takes over the "SPACE to serve" hint from lesson 4.1:
+
+```odin
+switch state {
+case .Title:
+	draw_centered("BREAKOUT", 200, 80, rl.WHITE)
+	draw_centered("A/D or arrows to move — SPACE to start", 320, 20, rl.GRAY)
+case .Playing:
+	rl.DrawCircleV(ball.pos, BALL_RADIUS, rl.WHITE)
+	if ball.stuck do draw_centered("SPACE to serve", SCREEN_H / 2 + 80, 20, rl.GRAY)
+case .Game_Over:
+	draw_centered("GAME OVER", 200, 70, rl.RED)
+	draw_centered("SPACE for menu", 300, 20, rl.GRAY)
+case .Win:
+	draw_centered("YOU WIN!", 200, 70, rl.GREEN)
+	draw_centered("SPACE for menu", 300, 20, rl.GRAY)
+}
+```
+
+Note the ball is drawn only in `.Playing` now (in 4.2 it was unconditional) — the title and end screens show the brick wall and paddle but no ball.
+
 ### Lives: make the kill zone cost something
 
 The bottom edge already respawns the ball; now it decrements a counter first:
@@ -59,6 +80,8 @@ for i in 0 ..< lives {
 	rl.DrawCircleV({f32(SCREEN_W - 30 - i * 25), 26}, 7, rl.WHITE)
 }
 ```
+
+Meanwhile 4.2's brick counter (`"bricks: %d"`) retires — the player cares about the campaign now, so the HUD's left slot becomes `rl.TextFormat("LEVEL %d", level_index + 1)`.
 
 ### Levels as data
 
@@ -121,6 +144,8 @@ load_level :: proc(bricks: ^[BRICK_ROWS][BRICK_COLS]Brick, level_index: int) -> 
 ```
 
 `brick_color` is a `switch` from character to `rl.Color` — the whole "grammar" of our tiny level language is six letters and a dot. Indexing a string gives you bytes (`u8`), which compare directly against rune literals like `'R'`.
+
+**Housekeeping:** `load_level` and `brick_color` *replace* last lesson's `init_bricks` and `row_color` — delete both, they're dead code now. Initialization in `main` changes to match: `bricks_left := load_level(&bricks, level_index)` takes over from `BRICK_ROWS * BRICK_COLS`, and `lives := START_LIVES` (`START_LIVES :: 3`) joins it. The initial `load_level` call at startup is what puts bricks behind the title screen; `.Title`'s transition to `.Playing` then reloads level 1 to guarantee a fresh start.
 
 This is **data-driven design**: the grid, the parser, and the collision code are written once and never touched again. New content arrives as new data. When you later want two-hit bricks, you add a *character*, not a feature branch.
 

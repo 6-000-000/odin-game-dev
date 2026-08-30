@@ -33,6 +33,8 @@ Lesson 7.1's single file becomes two:
 
 Both files say `package main`, so they share one scope exactly as if concatenated: `main.odin` calls `spawn_wave` and `update_ship` with **no import statement** (module 1.5's rule). Even `SCREEN_W`, declared in `main.odin`, is used inside `entities.odin`'s `wrap`. `odin run` compiles the whole folder — the folder *is* the build. From now on, `main.odin` stays small: the loop, the states, the HUD. Everything with a `pos` lives in `entities.odin`.
 
+The move is mechanical, with one refactor worth naming: 7.1's inline ship block (rotate / thrust / damp / integrate / wrap) becomes `update_ship :: proc(ship: ^Ship, dt: f32)` — the body is character-for-character what you typed in 7.1, just lifted into a proc so `main` reads `update_ship(&world.ship, dt)`. `ship_facing`, `ship_point`, `draw_ship`, and `wrap` move over unchanged.
+
 ### Why pools beat dynamic arrays here
 
 Flappy pooled 8 pipes. Asteroids wants 64 rocks — and next lesson adds bullets that live for 0.9 seconds and die constantly. A `[dynamic]` array forces you into `unordered_remove` while iterating backward (Pong 3.4's trick), with memory that grows and shrinks behind your back. A pool deletes all of that:
@@ -87,7 +89,16 @@ spawn_wave :: proc(world: ^World, n: int) {
 }
 ```
 
-The free-slot search *is* the spawn logic — no append, no index bookkeeping. Positions come from `random_edge_pos`, which rejection-samples random points until one lands in an 80 px band along the edges **and** at least 150 px from the ship (`SHIP_CLEARANCE` — spawning a rock on top of the player is a rage-quit). Velocities come from `random_drift(30, 90)`: a random direction at 30–90 px/s.
+The free-slot search *is* the spawn logic — no append, no index bookkeeping. Positions come from `random_edge_pos`, which rejection-samples random points until one lands in an 80 px band along the edges **and** at least 150 px from the ship (`SHIP_CLEARANCE` — spawning a rock on top of the player is a rage-quit). One difference from Snake's food spawner: the rejection loop is **capped at 32 attempts**, and on giving up returns the corner `{0, 0}` — far enough from the ship to be safe, and it keeps the spawn's worst case bounded (an unbounded loop can stall in principle the frame the pool is nearly full):
+
+```odin
+for _ in 0 ..< 32 {
+	// ... roll a point, accept if near an edge and clear of the ship ...
+}
+return {0, 0} // gave up; a corner is far enough
+```
+
+Velocities come from `random_drift(30, 90)` — the polar→cartesian conversion from Pong's serve, packaged as a proc: a random `angle` in `[0, 2π)`, a random `speed` in the given range, `{cos(angle), sin(angle)} * speed`.
 
 ### Update and draw
 
@@ -109,7 +120,7 @@ draw_asteroids :: proc(world: ^World) {
 }
 ```
 
-`DrawPolyLines` takes its rotation in **degrees** — the same convention as the ship, so no conversion anywhere. `rotation += rot_speed * dt` gives each rock its own lazy spin. And `wrap` is the ship's proc from 7.1, unchanged: one wrapper, every entity. That's the payoff of giving it a `radius` parameter.
+`DrawPolyLines` takes its rotation in **degrees** — the same convention as the ship, so no conversion anywhere — and `ASTEROID_SIDES :: 9` makes a lumpy nine-sided blob that reads as rock without any art. `rotation += rot_speed * dt` gives each rock its own lazy spin. And `wrap` is the ship's proc from 7.1, unchanged: one wrapper, every entity. That's the payoff of giving it a `radius` parameter.
 
 🌐 **Web dev callout — pools are slab allocation**
 > You've met this pattern: database connection pools, worker thread pools, V8's object arenas. The motivation is identical — allocation is expensive and unpredictable, so pay it once up front and recycle forever. In JS, an array you `push`/`splice` every frame eventually triggers the GC; in a game loop, a GC-style pause *is* a dropped frame. Odin has no GC, but the habit is the point: per-frame allocation is a code smell in any language that has to hit a frame deadline.
@@ -129,8 +140,9 @@ The ship flies exactly as in 7.1, now sharing the screen with 4 fat wireframe as
 ## Exercises
 
 1. **Easy:** Give each asteroid its own vertex count: add `sides: i32` to `Asteroid`, set it from `rl.GetRandomValue(7, 11)` at spawn, and pass it to `DrawPolyLines`. Same rocks, instant variety.
-2. **Easy:** Bias spawn velocities toward the screen center so rocks cross the playfield instead of skimming along the edges. (Hint: direction from `pos` toward `{SCREEN_W/2, SCREEN_H/2}`, plus ±0.6 rad of random spread.)
-3. **Medium:** Asteroid-asteroid collision: for every active pair (`i < j`), if the circles overlap, swap their velocities. It's O(n²) — 64²/2 ≈ 2,000 checks a frame, which is fine *here*. Remember this number in module 8, where 2,000 boids make the same loop cost two million checks.
+2. **Easy:** Bias spawn velocities toward the screen center so rocks cross the playfield instead of skimming along the edges. (Hint: direction from `pos` toward `{SCREEN_W / 2, SCREEN_H / 2}`, plus ±0.6 rad of random spread.)
+3. **Medium:** Asteroid-asteroid collision: for every active pair (`i < j`), if the circles overlap, swap their velocities. It's O(n²) — 64²/2 ≈ 2,000 checks a frame, which is fine *here*. Remember this number in module 8, where 2,000 boids make the same kind of scan cost four *million* checks.
 4. **Medium:** Wrap ghosting: when an asteroid is within `radius` of an edge, draw it a second time offset by ±`SCREEN_W`/`SCREEN_H` on the opposite side. Classic Asteroids does this so rocks never pop at the boundary. Do it entirely inside `draw_asteroids` — don't touch `update`.
+5. **Hard:** Prove the pool is O(1): time `spawn_wave` with `rl.GetTime()` when the pool is empty vs. nearly full, and confirm the cost stays flat. Then add a `next_free: int` hint that resumes the scan where it left off instead of always from slot 0 — measure again. (At 64 slots it won't matter; write down the size where it would, and why.)
 
 **Next:** [7.3 Shooting and splitting](03-shooting-and-splitting.md)

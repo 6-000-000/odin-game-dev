@@ -456,7 +456,7 @@ main :: proc() {
 
 		rl.EndMode2D()
 
-		// HUD last (on top, and unshaken)
+		// HUD next (unshaken) — state screens draw last, on top of everything
 		rl.DrawText(rl.TextFormat("LEVEL %d", level_index + 1), 20, 20, 20, rl.GRAY)
 		for i in 0 ..< lives {
 			rl.DrawCircleV({f32(SCREEN_W - 30 - i * 25), 26}, 7, rl.WHITE)

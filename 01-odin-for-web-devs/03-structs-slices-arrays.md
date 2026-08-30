@@ -43,7 +43,7 @@ paddle := Paddle{
 
 Field access is `paddle.pos.x`. Initialization uses field names — order doesn't matter, omitted fields zero-initialize. There is **no constructor and no `new`**; a struct literal is just data.
 
-> **🌐 Web dev callout — struct vs class**
+🌐 **Web dev callout — struct vs class**
 > A struct is a TypeScript `interface` that actually *is* the memory layout, not a shape erased at runtime. No methods — you write procs that take the struct:
 >
 > ```ts
@@ -114,7 +114,7 @@ for row, y in grid {                    // 2D
 }
 ```
 
-🌐 **Web dev callout:** `for x, i in arr` is `arr.forEach((x, i) => ...)`. The `&` variant has no JS equivalent — it's how you mutate the actual element instead of a copy, like iterating with indices and writing `arr[i].pos = ...`. The `0 ..< n` range is Rust-style; there's also inclusive `0 ..= n`.
+`for x, i in arr` is `arr.forEach((x, i) => ...)`. The `&` variant has no JS equivalent — it's how you mutate the actual element instead of a copy, like iterating with indices and writing `arr[i].pos = ...`. The `0 ..< n` range is Rust-style; there's also inclusive `0 ..= n`.
 
 ## Removing elements (the swap-remove trick)
 
@@ -136,7 +136,7 @@ score, ok := high_scores["alice"]   // ok = key existed
 defer delete(high_scores)
 ```
 
-We use a map once in this course (the boids spatial hash). Everything else is arrays.
+Maps are good to recognize, but this course never needs one — even the boids spatial hash (lesson 8.3) turns out to be faster as flat arrays. Everything here is arrays.
 
 ## Where this leads: layout matters
 

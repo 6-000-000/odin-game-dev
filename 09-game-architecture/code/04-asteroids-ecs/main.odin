@@ -69,7 +69,9 @@ main :: proc() {
 		rl.ClearBackground(rl.BLACK)
 		draw_world(&world)
 
-		if state == .Game_Over {
+		switch state {
+		case .Playing:
+		case .Game_Over:
 			draw_centered("GAME OVER", 200, 64, rl.WHITE)
 			draw_centered(rl.TextFormat("FINAL SCORE %d", world.game.score), 290, 24, rl.GRAY)
 			draw_centered("SPACE to play again", 330, 20, rl.GRAY)

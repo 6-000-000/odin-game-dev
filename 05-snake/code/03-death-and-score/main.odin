@@ -240,7 +240,10 @@ main :: proc() {
 		best_text := rl.TextFormat("BEST %d", best)
 		rl.DrawText(best_text, SCREEN_W - rl.MeasureText(best_text, 20) - 10, 10, 20, rl.GRAY)
 
-		if state == .Game_Over {
+		// state screens, switched in draw just like in update
+		switch state {
+		case .Playing:
+		case .Game_Over:
 			rl.DrawRectangle(0, 0, SCREEN_W, SCREEN_H, rl.Fade(rl.BLACK, 0.65))
 			draw_centered("GAME OVER", 250, 60, rl.RED)
 			draw_centered(rl.TextFormat("score %d", score), 340, 24, rl.WHITE)

@@ -125,7 +125,18 @@ for c, i in snake {
 }
 ```
 
-The 1px inset (`+1`, `CELL - 2`) leaves a seam between cells so individual segments stay readable at speed. `draw_grid` paints faint lines (`{255, 255, 255, 8}` — nearly transparent white) so the grid is visible without shouting. Index 0 gets the brighter shade: the head is the only cell the player must track, so make it free to find.
+The 1px inset (`+1`, `CELL - 2`) leaves a seam between cells so individual segments stay readable at speed. Index 0 gets the brighter shade: the head is the only cell the player must track, so make it free to find.
+
+The backdrop is two constants and one tiny proc. `BACKGROUND :: rl.Color{15, 15, 18, 255}` (near-black) fills the window, and `draw_grid` paints faint lines over it (`GRID_LINE` is `{255, 255, 255, 8}` — nearly transparent white) so the grid is visible without shouting:
+
+```odin
+draw_grid :: proc() {
+	for x in 0 ..= COLS do rl.DrawLine(i32(x * CELL), 0, i32(x * CELL), SCREEN_H, GRID_LINE)
+	for y in 0 ..= ROWS do rl.DrawLine(0, i32(y * CELL), SCREEN_W, i32(y * CELL), GRID_LINE)
+}
+```
+
+Note the **inclusive** ranges: `0 ..= COLS` draws COLS+1 lines — 30 cells need 31 fence posts, including the right and bottom edges of the window.
 
 ## Full listing
 
@@ -145,5 +156,6 @@ A three-cell snake glides right in crisp hops, about seven times a second. Arrow
 2. **Easy:** Wrap-around walls: in `step`, add `new_head.x = (new_head.x + COLS) %% COLS` and the same for `y` with `ROWS`. (The `+ COLS` keeps the value non-negative; `%%` is Odin's floored modulo.) Drive off the right edge, appear on the left.
 3. **Medium:** Upgrade the buffer to a two-slot queue: a `[dynamic]Cell` capped at 2 entries, the tick shifts the front entry off. Now up-then-left within one tick turns up on this tick and left on the next — both intents survive. This is what modern Snake-likes ship.
 4. **Medium:** Shade the body by distance from the head: in the draw loop, `rl.ColorLerp(HEAD_COLOR, BODY_COLOR, f32(i) / f32(len(snake)))`. Purely a render change — the simulation doesn't know or care, which is exactly the point.
+5. **Hard:** Replay mode: record `dir` into a `[dynamic]Cell` on every tick, and on R play the last run back at 2× speed (a `replaying: bool`, a playback index, the accumulator driving both). Recording *decisions per tick* — not positions per frame — is what makes the replay tiny; it's the command pattern (lesson 9.1) in embryo.
 
 **Next:** [5.2 Growing and food](02-growing-and-food.md)

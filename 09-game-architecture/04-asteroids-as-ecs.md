@@ -34,7 +34,9 @@ Same game, same constants (thrust 300, rotation 220 deg/s, bullet speed 500 / li
 | `world.score/lives/wave` | A plain `Game` struct — still not entities |
 | `update_asteroids`, `update_bullets`… | Systems named by *capability*: move, spin, lifetime, input, collide |
 
-Particles and audio from 7.4 port identically (an exhaust puff is Position+Velocity+Lifetime; a sound is a direct call at the death site) — they're deferred to the exercises so the comparison stays readable.
+Particles from 7.4 port as entities (an exhaust puff is Position+Velocity+Lifetime) — that's exercise 3. Audio ports as *itself*: `load_sounds` plus an `rl.PlaySound` at each event site, since systems are plain procs and there's no ECS lesson in it. Both are left out of the snapshot to keep the comparison readable.
+
+One deliberate simplification to flag against 7.3's constants: rocks here tumble at `rand.float32_range(-90, 90)` for *all* spawns — 7.3 used ±60 for wave rocks and ±90 for splits, but 9.4's single shared `spawn_rock` serves both, so the livelier range won. Everything else matches 7.3 exactly.
 
 ### Growing the framework is the point
 
@@ -58,7 +60,7 @@ Component :: enum {
 }
 ```
 
-Six new components cost six enum cases, six columns, six adders — and zero changes to existing code. That *is* the ECS sales pitch, and it's true as far as it goes. `Angle` gets its own column (`facings`) rather than sharing Spin's `angles`: same data shape, different role — a rock tumbles for looks, a ship's heading is gameplay. `PlayerControlled` is a **tag**: no array at all, because there's nothing to store. (If tags feel familiar — they're marker interfaces, or boolean flag columns on a row.)
+The five new components cost five enum cases, four columns (`facings`, `radii`, `tiers`, `invuln_timers`), and five adders — the tag needs no column. That *is* the ECS sales pitch, and it's *mostly* true. The honest footnotes, so your 9.3→9.4 diff holds no surprises: the playground-only pieces were **removed** (`Pulse` with its `pulses`/`scales` columns, `add_pulse`, `system_pulse`, and `clear_world`), one framework proc was **added** — `reset_world`, which zeroes the World but preserves the `free_list`'s allocation across restarts (grab the slice, `world^ = World{}`, put it back) — and `World` gained the `game` field you'll meet below. `Angle` gets its own column (`facings`) rather than sharing Spin's `angles`: same data shape, different role — a rock tumbles for looks, a ship's heading is gameplay. `PlayerControlled` is a **tag**: no array at all, because there's nothing to store. (If tags feel familiar — they're marker interfaces, or boolean flag columns on a row.)
 
 Tier data lives in tables indexed *by the enum*:
 
@@ -70,7 +72,7 @@ TIER_RADIUS := [Rock_Tier]f32{.Big = 40, .Medium = 22, .Small = 12}
 TIER_SCORE  := [Rock_Tier]int{.Big = 20, .Medium = 50, .Small = 100}
 ```
 
-> **🌐 Web dev callout — hand-rolled tables vs one generic engine**
+🌐 **Web dev callout — hand-rolled tables vs one generic engine**
 > This port is a refactoring you've done a dozen times. 7.3 is the "bespoke table per domain" era: the rocks table, the bullets table, each with its own allocator (`free_asteroid`, `free_bullet`), its own validity convention (`active`), its own query procs. 9.4 is the "one generic table engine" era: one allocator, one validity check, one query mechanism — you pay in indirection (`world.positions[e.index]` instead of `rock.pos`) and buy back uniformity. You know this tradeoff from the other side too: it's exactly why teams adopt a framework over hand-rolled per-feature code, and exactly why they sometimes regret it when the app only ever had three features. Hold both feelings; the comparison below needs them.
 
 ### The game systems
@@ -185,6 +187,10 @@ case .Playing:
 	system_collide_ship(&world)
 ```
 
+`system_wrap` is the one system not shown above, and it's the nicest demonstration of the column model: it sweeps every entity with `.Position`, using `world.radii[i]` as the wrap margin when the entity has `.Radius` — and falling back to `BULLET_RADIUS` when it doesn't. One proc wraps ships, rocks, and bullets without knowing any of those kinds exist.
+
+Two behavior notes against 7.3, both deliberate. In `.Game_Over` the loop runs move/wrap/spin but **not** `system_lifetime`, so in-flight bullets now drift forever (7.3 froze them); rocks and ship-death behave the same either way. And `draw_ship` reads `rl.IsKeyDown(.UP)` directly to draw the flame — input inside draw code, a small impurity kept so drawing needs no game state; the purist fix is a `Thrusting` tag written by `system_input`, and you're equipped to write it.
+
 ### The honest comparison
 
 This lesson's reason to exist. Same game, both ways, no religion:
@@ -196,6 +202,7 @@ This lesson's reason to exist. Same game, both ways, no religion:
 | Stale references | Raw pointers into pools — recycle hazard | Handles + generations — safe for free |
 | Reading an entity | `rock.pos` — typed, direct | `world.positions[e.index]` — a hop, no type at the end |
 | Collision loops | Typed nested loops over known pools | Scan the whole store with mask tests, early-out per entity |
+| Capacity | Hard caps per kind: 64 rocks, 32 bullets | One shared 1024-slot store — any mix of kinds, until it isn't |
 | System boundaries | "The asteroid code" is a place | Capabilities, listed explicitly in the main loop |
 | Top-to-bottom read | `update_bullets` shows you *bullets* | `system_lifetime` shows you *anything with a Lifetime* — you grep to find who |
 | Debugging | A rock is a struct in the debugger | An entity is a number; you inspect columns by index |
@@ -208,7 +215,7 @@ Three axes decide it: **entity count** × **entity variety** × **how much itera
 - **Dozens-to-hundreds of entities, few kinds** — every project in this course: pools + plain structs win on simplicity, and it isn't close. Pong, Breakout, Snake, Flappy: trivially. Asteroids (~100 entities, 3 kinds): the pool was fine; you ported it for the *lesson*, not because it hurt.
 - **Thousands of entities, one kind** — Boids: organization is irrelevant (an ECS with one component set is a pool with extra steps). *Layout* is everything — that's 9.2. Layout and organization are orthogonal choices; either half of this module applies without the other.
 - **High variety, heavy design iteration** — dozens of enemy/pickup/buff kinds, designers mixing capabilities weekly: ECS pays for itself. Adding "a rock that also homes and also pulses" being a mask edit instead of a refactor is the whole ballgame.
-- Real engines land everywhere on this: Unity DOTS, Bevy, and flecs are full ECS (with archetype storage and parallel scheduling our 150 lines skip); plenty of shipped games run hybrid — ECS for gameplay organization, hand-tuned SoA for the physics inner loop. You now have the vocabulary for all of it, and — more valuable — a working sense of when *not* to reach for it.
+- Real engines land everywhere on this: Unity DOTS, Bevy, and flecs are full ECS (with archetype storage and parallel scheduling our 180 lines skip); plenty of shipped games run hybrid — ECS for gameplay organization, hand-tuned SoA for the physics inner loop. You now have the vocabulary for all of it, and — more valuable — a working sense of when *not* to reach for it.
 
 ## Full listing
 
@@ -228,7 +235,7 @@ odin run 09-game-architecture/code/04-asteroids-ecs
 
 1. **Easy:** Add the UFO: Position + Velocity + Radius + Lifetime, spawned every ~8 s crossing the screen, drawn as a squashed ellipse (`rl.DrawEllipse` — or a flat triangle). Count your lines; ~15 is the ECS dividend. Then extend `system_collide_ship` so it can kill you — hint: it tests `ROCK_MASK`, and a UFO isn't a rock. One clean option: a `Hazard` tag both carry.
 2. **Medium:** Add a `Shield` component: the ship spawns with one; the first rock hit consumes the shield (remove the component) instead of a life, and grants brief invulnerability so the same rock doesn't instantly re-hit. Draw a ring while the bit is set.
-3. **Medium:** Port 7.4's exhaust particles: while thrusting, spawn entities with Position + Velocity + Lifetime (+ Pulse if you want them to shimmer) at the tail of the ship, short lifetimes, drawn as fading dots. Notice the lifetime system already despawns them — you wrote no cleanup code.
+3. **Medium:** Port 7.4's exhaust particles: while thrusting, spawn entities with Position + Velocity + Lifetime at the tail of the ship, short lifetimes, drawn as fading dots. Notice the lifetime system already despawns them — you wrote no cleanup code. (Want them to shimmer like 9.3's blinkers? Pulse was removed in the port — re-adding it *is* the exercise's hard mode: enum case, `pulses` column, `add_pulse`, and a `system_pulse`. Four pieces, by now familiar.)
 4. **Hard:** Swap the component columns for a single `#soa` mega-store (one `#soa[MAX_ENTITIES]Component_Data` struct of all fields) and measure against the current plain arrays at a few thousand entities — 9.2's exercise playbook applies. Decide, with numbers, whether the layout change bought anything at this scale, and write your verdict in a comment.
 
 **Next:** [10.1 Where to go next](../10-next-steps/01-where-to-go-next.md)

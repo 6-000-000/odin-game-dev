@@ -90,8 +90,10 @@ main :: proc() {
 		draw_particles(&world)
 		draw_asteroids(&world)
 		draw_bullets(&world)
-		if state == .Playing {
+		switch state {
+		case .Playing:
 			draw_ship(world.ship)
+		case .Game_Over:
 		}
 		rl.EndMode2D()
 
@@ -100,7 +102,9 @@ main :: proc() {
 		draw_centered(rl.TextFormat("%d", world.score), 12, 28, rl.WHITE)
 		rl.DrawText(rl.TextFormat("WAVE %d", world.wave), SCREEN_W - 110, 16, 20, rl.GRAY)
 
-		if state == .Game_Over {
+		switch state {
+		case .Playing:
+		case .Game_Over:
 			draw_centered("GAME OVER", 200, 64, rl.WHITE)
 			draw_centered(rl.TextFormat("FINAL SCORE %d", world.score), 290, 24, rl.GRAY)
 			draw_centered("SPACE to play again", 330, 20, rl.GRAY)

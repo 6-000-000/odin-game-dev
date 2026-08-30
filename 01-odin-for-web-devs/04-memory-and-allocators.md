@@ -32,7 +32,7 @@ fmt.println(a.x)  // still 10
 
 Everything in Odin behaves this way: structs, fixed arrays, numbers. Assignment and proc arguments copy. (Slices, dynamic arrays, and maps are the exception: copying them copies the *header* — pointer+len — so the underlying data is shared. Same as JS arrays, conveniently.)
 
-> **🌐 Web dev callout — this is backwards from JS**
+🌐 **Web dev callout — this is backwards from JS**
 > In JS, primitives copy and objects share (by reference). In Odin, *everything* copies — including structs — unless you explicitly share via a pointer or slice header. This kills the whole class of "spooky mutation at a distance" bugs: when you pass an entity to a proc, the proc gets its own copy and can't hurt yours. When you *want* shared mutation, the `^` in the signature advertises it.
 
 ## Pointers, the friendly version
@@ -110,7 +110,6 @@ main :: proc() {
 
 Run with `odin run . -debug` (debug is the default for `odin run`), and if your program exits with unfreed allocations, you get a list with exact source locations. `when ODIN_DEBUG { ... }` is a compile-time conditional — release builds skip this entirely, zero cost.
 
-> **🌐 Web dev callout — what's an allocator?**
 > Closest analogue: a `fetch` interceptor, but for memory. Every `make` in Odin goes through `context.allocator` — an implicit "context" value threaded through your program (Odin's answer to dependency injection). Swapping it for the tracking allocator is like wrapping `fetch` to log requests. Games exploit this hard: per-frame temporary allocations go to a `temp_allocator` that resets each frame — but you won't need that until you're optimizing, and maybe not even then.
 
 ## What about use-after-free and all the C horror stories?

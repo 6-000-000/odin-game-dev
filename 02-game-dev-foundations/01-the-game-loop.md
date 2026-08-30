@@ -36,7 +36,7 @@ for !rl.WindowShouldClose() {
 
 Everything is in that loop. Menus, physics, AI, animations — all just code that runs every frame. There is no "when the ball hits the wall, do X" event. There is: every frame, check if ball overlaps wall; if so, bounce.
 
-> **🌐 Web dev callout — `requestAnimationFrame`, but you own it**
+🌐 **Web dev callout — `requestAnimationFrame`, but you own it**
 > You've seen this shape: `function frame() { update(); render(); requestAnimationFrame(frame) }`. The game loop is that, minus the browser scheduler — *your* `for` loop drives time itself. The psychological difference is bigger than the technical one: on the web, state lives in the DOM and frameworks reconcile it; here, state lives in plain variables and you re-render the world from scratch each frame. No diffing, no virtual DOM, no stale state. The screen is a pure function of your structs.
 
 ## Delta time: why `pos += 5` is a bug
@@ -89,7 +89,7 @@ for !rl.WindowShouldClose() {
 }
 ```
 
-Snake builds its entire movement system on this pattern (it's perfect for grid games), and the boids capstone revisits it for simulation stability. For most arcade games (Pong, Breakout, Flappy), plain variable dt with sensible speeds is completely fine — you'll know when you need more.
+Snake builds its entire movement system on this pattern (it's perfect for grid games), and lesson 9.1's field guide names when to reach for it again (deterministic sims, replays, netcode). For most arcade games (Pong, Breakout, Flappy), plain variable dt with sensible speeds is completely fine — you'll know when you need more.
 
 ## Full listing
 
@@ -110,6 +110,6 @@ odin run 02-game-dev-foundations/code/01-game-loop
 1. **Easy:** Add a third circle moving vertically with dt at 250 px/s, bouncing off the top and bottom edges (flip the sign of its velocity at the boundary).
 2. **Easy:** Display `rl.GetFrameTime() * 1000` as milliseconds per frame. At 60 fps it should read ≈ 16.7 ms.
 3. **Medium:** Make the dt circle accelerate: add a `speed: f32` that increases by 50 px/s every second the RIGHT key is held, and decays back toward 200 when released (use `math.lerp` or a simple clamp).
-4. **Medium:** Implement the accumulator pattern above around the dt circle's update. Set `TICK` to `1.0/30.0` (a 30 Hz simulation) — you'll see the circle move in visible steps while FPS stays high. This stutter is exactly why Snake renders every frame but steps its grid at 10 Hz.
+4. **Medium:** Implement the accumulator pattern above around the dt circle's update. Set `TICK` to `1.0/30.0` (a 30 Hz simulation) — you'll see the circle move in visible steps while FPS stays high. This stutter is exactly why Snake renders every frame but steps its grid only about seven times a second.
 
 **Next:** [2.2 Drawing and the coordinate system](02-drawing-and-coordinates.md)

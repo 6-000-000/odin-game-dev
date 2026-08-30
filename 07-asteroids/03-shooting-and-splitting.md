@@ -50,7 +50,33 @@ try_fire :: proc(world: ^World) {
 }
 ```
 
-`free_bullet` is the free-slot search from 7.2, this time returning `nil` when full — and the caller just *drops the shot*. Defensive and invisible: at 0.9 s life and 0.15 s cooldown you can keep at most 6 bullets live anyway; the 32-cap is pure headroom. Note `b^ = Bullet{...}`: `b` is a `^Bullet` pointer into the pool, so we dereference-assign. Range loops give us references (`b.active = false` writes through); an explicit pointer needs `^`.
+`free_bullet` is the free-slot search from 7.2, promoted to a proc and returning `nil` when full — and the caller just *drops the shot*. Defensive and invisible: at 0.9 s life and 0.15 s cooldown you can keep at most 6 bullets live anyway; the 32-cap is pure headroom. Note `b^ = Bullet{...}`: `b` is a `^Bullet` pointer into the pool, so we dereference-assign. Range loops give us references (`b.active = false` writes through); an explicit pointer needs `^`.
+
+The promotion is worth seeing, because it reshapes code you already typed. Both pools get the same three-liner:
+
+```odin
+// The free-slot search: the pool's allocator. Returns nil when the pool is full.
+free_asteroid :: proc(world: ^World) -> ^Asteroid {
+	for &a in world.asteroids {
+		if !a.active do return &a
+	}
+	return nil
+}
+```
+
+And 7.2's `spawn_wave` is **rewritten on top of it** — the `spawned` counter and the by-reference scan are gone; delete that version:
+
+```odin
+spawn_wave :: proc(world: ^World, n: int) {
+	for _ in 0 ..< n {
+		a := free_asteroid(world)
+		if a == nil do return // pool full — spawn what we could (defensive)
+		a^ = Asteroid{ /* same fields as 7.2 */ }
+	}
+}
+```
+
+One allocator idiom, three consumers already (`spawn_wave`, `try_fire`, and `split_asteroid` below).
 
 Bullets integrate, age, die, and wrap — the full entity lifecycle in six lines:
 
@@ -134,7 +160,9 @@ collide_ship :: proc(world: ^World) {
 }
 ```
 
-`respawn_ship` centers the ship, zeroes velocity, and sets `invuln = INVULN_TIME` (2 s) — the collision guard above is what *enforces* the safety. (The ship still draws solid white this lesson; the blink arrives with the juice in 7.4.) The ship's collision radius is `ship.radius * 0.7` — smaller than the drawn triangle. Hitboxes that are kinder than the visuals are a tradition; never make the player die to a pixel that looked like empty space.
+`respawn_ship` centers the ship, zeroes velocity, resets the angle to 0 (pointing up), and sets `invuln = INVULN_TIME` (2 s) — the collision guard above is what *enforces* the safety. (The ship still draws solid white this lesson; the blink arrives with the juice in 7.4.) The ship's collision radius is `ship.radius * 0.7` — smaller than the drawn triangle. Hitboxes that are kinder than the visuals are a tradition; never make the player die to a pixel that looked like empty space.
+
+`World` grows to carry the new state — `bullets: [BULLET_MAX]Bullet`, `score: int`, `lives: int`, `wave: int` — with `lives` starting at `START_LIVES :: 3`. Drawing bullets is the same skip-inactive loop you've now written three times, one `rl.DrawCircleV` per live slot.
 
 Wave progression lives in `main.odin` right after the collision calls:
 
@@ -148,6 +176,8 @@ if world.lives <= 0 {
 ```
 
 Wave 1 spawns 4 rocks; each clear adds one more. And `start_game` shows off the pool's best trick — `world^ = World{}` zeroes the entire struct, retiring every slot of every pool in one assignment.
+
+(One removal while you're diffing: 7.2's R-key redeal is gone. Waves arrive on their own now, so the debug key would just be a cheat for the counter.)
 
 The HUD: score top-center, `WAVE n` top-right, and lives as a row of little ship triangles top-left — `draw_lives` reuses `ship_point` with angle 0. The `Game_State` enum is back from Pong 3.3 (`Playing` / `Game_Over`, switched in both update and draw), with one twist: `.Game_Over` keeps calling `update_asteroids`, so the field keeps drifting behind the text.
 

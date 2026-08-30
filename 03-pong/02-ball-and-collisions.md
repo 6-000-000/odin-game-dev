@@ -37,6 +37,13 @@ BALL_RADIUS :: 8
 BALL_SPEED :: 350
 ```
 
+This lesson also needs two new imports at the top of the file, next to `import rl "vendor:raylib"`:
+
+```odin
+import "core:math"       // cos, sin, PI
+import "core:math/rand"  // float32_range
+```
+
 Movement is one line: `ball.pos += ball.vel * dt`. Everything else in this lesson is about deciding what `vel` *is*. Drawing is one call — `rl.DrawCircleV(ball.pos, BALL_RADIUS, rl.WHITE)` next to the two `draw_paddle` calls.
 
 The serve picks a shallow random angle and a random side — you never want the same serve twice:
@@ -49,7 +56,7 @@ ball_serve_vel :: proc() -> rl.Vector2 {
 }
 ```
 
-`{cos θ, sin θ}` is the unit vector at angle θ — multiplying by speed turns "a direction" into "a velocity". This polar→cartesian conversion shows up in every game with angled movement; Asteroids is made of it.
+`{cos θ, sin θ}` is the unit vector at angle θ — multiplying by speed turns "a direction" into "a velocity". This polar→cartesian conversion shows up in every game with angled movement; Asteroids is made of it. (`rl.GetRandomValue(0, 1)` is raylib's integer roll, inclusive of both ends — here a coin flip for which side serves.)
 
 ### Wall bounces: reflect and reposition
 
@@ -65,13 +72,15 @@ Two details here, both load-bearing:
 1. **Check the velocity's sign too** (`vel.y < 0`). Without it, a ball that's already moving downward but still overlapping the edge gets flipped *upward* every frame and sticks to the wall. Only bounce balls that are actually heading out.
 2. **Snap the position back inside** (`pos.y = BALL_RADIUS`). The ball moved *past* the boundary this frame; if you only flip velocity it can sit outside for a frame — visible, and it can re-trigger the condition. Reflect velocity, correct position. This pair is the collision mantra for the whole course.
 
+The bottom wall is the same test mirrored — `ball.pos.y > SCREEN_H - BALL_RADIUS && ball.vel.y > 0`, snapping to `SCREEN_H - BALL_RADIUS`. It's in the snapshot; don't forget it, or every rally ends at the floor.
+
 ### `paddle_rect`: one conversion, two consumers
 
 Collision needs the paddle as an `rl.Rectangle`, and drawing needs the same top-left corner — so the conversion from lesson 3.1's `draw_paddle` gets promoted into its own proc, and `draw_paddle` becomes a one-liner over it:
 
 ```odin
 paddle_rect :: proc(p: Paddle) -> rl.Rectangle {
-	return {p.pos.x - PADDLE_W/2, p.pos.y - PADDLE_H/2, PADDLE_W, PADDLE_H}
+	return {p.pos.x - PADDLE_W / 2, p.pos.y - PADDLE_H / 2, PADDLE_W, PADDLE_H}
 }
 
 draw_paddle :: proc(p: Paddle, color: rl.Color) {
@@ -90,9 +99,9 @@ paddles := [2]Paddle{player, opponent}
 for p in paddles {
 	if rl.CheckCollisionCircleRec(ball.pos, BALL_RADIUS, paddle_rect(p)) {
 		ball.vel.x = -ball.vel.x
-		ball.pos.x = p.pos.x + (ball.pos.x > p.pos.x ? 1 : -1) * (PADDLE_W/2 + BALL_RADIUS)
+		ball.pos.x = p.pos.x + (ball.pos.x > p.pos.x ? 1 : -1) * (PADDLE_W / 2 + BALL_RADIUS)
 
-		offset := clamp((ball.pos.y - p.pos.y) / (PADDLE_H/2), -1, 1)
+		offset := clamp((ball.pos.y - p.pos.y) / (PADDLE_H / 2), -1, 1)
 		ball.vel.y = offset * BALL_SPEED
 	}
 }
@@ -138,5 +147,6 @@ The ball serves at a random angle, bounces off top/bottom walls, reflects off pa
 2. **Easy:** Draw the ball as a square instead of a circle (`DrawRectangleV` centered on `ball.pos`). The collision still uses the circle radius — notice that gameplay barely changes. Collision shape ≠ render shape, and that's normal.
 3. **Medium:** Add spin: while the ball is in flight, holding W or S adds ±200 to `vel.y` per second (clamped). This breaks "real" Pong rules and is extremely fun.
 4. **Medium:** Cap the bounce angle: after computing `offset`, reconstruct `vel` so its angle never exceeds 60° from horizontal (hint: `math.atan2`, clamp the angle, `cos`/`sin` back). This prevents degenerate near-vertical rallies.
+5. **Hard:** Face detection for the paddle: when the ball overlaps a paddle's *top or bottom edge* instead of its face, reflect `vel.y` instead of `vel.x` (hint: compare x- and y-penetration depths, like Breakout 4.2 will formalize). Edge catches become sharp angled returns — and the "ball trapped inside the paddle" double-bounce dies for good.
 
 **Next:** [3.3 Scoring and game states](03-scoring-and-game-states.md)

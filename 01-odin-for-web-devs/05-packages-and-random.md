@@ -37,7 +37,7 @@ math.sqrt(x)          // vector lengths
 math.sin(t), math.cos(t)
 math.clamp(v, lo, hi) // keep paddle on screen
 math.lerp(a, b, t)    // smooth movement toward a target
-math.PI               // radians; raylib also has rl.PI and DEG2RAD/RAD2EG
+math.PI               // radians; raylib also has rl.PI and DEG2RAD/RAD2DEG
 ```
 
 Note that `min`/`max`/`abs`/`clamp` are actually built-ins in modern Odin (no import needed) for many type combinations; `core:math` covers the float-generic cases. If the compiler ever says "undefined: min", import `core:math`… but usually it just works.
@@ -131,6 +131,6 @@ You know where `sqrt`, `clamp`, `printf`, and `float32_range` come from, and you
 1. **Easy:** Roll two dice (`rl.GetRandomValue(1, 6)`) 10 times and print the sums. Then seed `rand` with a fixed value and use `rand.int31_max(6) + 1` instead; run twice and confirm identical output.
 2. **Easy:** Use `math.lerp` to print 5 steps from 0 to 100 (`t` = 0, 0.25, 0.5, 0.75, 1).
 3. **Medium:** Split exercise 1.3.3 (`remove_dead` for particles) into a two-file package: `particle.odin` holds the struct and procs, `main.odin` runs a small simulation. No new logic — just the split.
-4. **Medium:** Write `random_point_in_circle :: proc(radius: f32) -> rl.Vector2` using `rand.float32` (hint: random angle + random distance; for uniform distribution use `radius * math.sqrt(rand.float32())` for the distance). This exact helper shows up when scattering asteroids and boids.
+4. **Medium:** Write `random_point_in_circle :: proc(radius: f32) -> rl.Vector2` using `rand.float32` (hint: random angle + random distance; for uniform distribution use `radius * math.sqrt(rand.float32())` for the distance — the sqrt compensates for area growing with r²). This is the helper to reach for whenever you scatter points inside a circle instead of a rectangle.
 
 **Next:** [Module 2 — Game Dev Foundations](../02-game-dev-foundations/01-the-game-loop.md)

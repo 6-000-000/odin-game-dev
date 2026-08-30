@@ -22,13 +22,25 @@
 
 ### Same game, rotated 90°
 
-Everything from Pong 3.2 is here, transposed. The screen is 800×600 now — Breakout wants a tall field — and the paddle is wide, short, and moves along **x**, clamped to the screen:
+Everything from Pong 3.2 is here, transposed. The screen is 800×600 now — Breakout wants a tall field — and the paddle is wide, short, and moves along **x**, clamped to the screen. The constants block sets the shape of the whole game:
+
+```odin
+PADDLE_W :: 100
+PADDLE_H :: 16
+PADDLE_SPEED :: 520
+PADDLE_Y :: SCREEN_H - 40 // the paddle's resting height, fixed
+
+BALL_RADIUS :: 8
+BALL_SPEED :: 420 // constant — no Pong-style speedup here
+```
 
 ```odin
 if rl.IsKeyDown(.A) || rl.IsKeyDown(.LEFT) do paddle.pos.x -= PADDLE_SPEED * dt
 if rl.IsKeyDown(.D) || rl.IsKeyDown(.RIGHT) do paddle.pos.x += PADDLE_SPEED * dt
 paddle.pos.x = clamp(paddle.pos.x, PADDLE_W / 2, SCREEN_W - PADDLE_W / 2)
 ```
+
+`paddle_rect` makes the trip too — Pong 3.2's proc, unchanged (`{p.pos.x - PADDLE_W / 2, p.pos.y - PADDLE_H / 2, PADDLE_W, PADDLE_H}`) — and drawing the paddle is one `rl.DrawRectangleRec(paddle_rect(paddle), rl.WHITE)`.
 
 ### The stuck ball
 
@@ -70,6 +82,15 @@ serve_ball :: proc(b: ^Ball) {
 ```
 
 Straight-up is `{0, -BALL_SPEED}`; rotating by `angle` turns that into `{sin, -cos} × speed`. You'll write this pattern every time something launches at an angle.
+
+While the ball sits stuck, the snapshot also draws a small centered hint — `MeasureText` (lesson 2.2) doing the centering math, drawn only in the stuck state:
+
+```odin
+if ball.stuck {
+	w := rl.MeasureText("SPACE to serve", 20)
+	rl.DrawText("SPACE to serve", (SCREEN_W - w) / 2, SCREEN_H / 2 + 80, 20, rl.GRAY)
+}
+```
 
 ### Walls: three of them
 
@@ -130,5 +151,6 @@ A wide paddle slides along the bottom (A/D or arrow keys) with the ball riding o
 2. **Easy:** While the ball is stuck, draw an aim hint: a thin line from the ball upward at a fixed angle (`rl.DrawLineV`, endpoint = ball pos + `{sin, -cos} * 80`).
 3. **Medium:** Paddle momentum: track the paddle's velocity (`(pos.x - prev_x) / dt`, stored each frame) and add 20% of it to the ball's `vel.x` on paddle hits, then renormalize to `BALL_SPEED`. "Flicking" the paddle puts english on the ball.
 4. **Medium:** Enforce a minimum horizontal speed: after every paddle bounce, if `abs(ball.vel.x) < 60`, set it to ±60 (preserving sign) and renormalize. No more interminable near-vertical rallies.
+5. **Hard:** Aimed serves: while the ball is stuck, LEFT/RIGHT adjusts a `serve_angle` clamped to ±`MAX_BOUNCE_ANGLE`, an arrow shows the aim (exercise 2's hint, made live), and SPACE serves at exactly that angle instead of a random one. Deterministic serves turn the opening into a skill shot — pinball's plunger, basically.
 
 **Next:** [4.2 The brick grid](02-brick-grid.md)

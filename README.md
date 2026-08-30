@@ -118,7 +118,7 @@ The mental models that differ from the web: the loop, the coordinate system, the
 
 ### Module 8 — Capstone: Boids 🐦
 Faithful to [Sebastian Lague's boids simulation](https://www.youtube.com/watch?v=bqtqltqcQhw): the same three rules, the same perceived-radius model, and the same spatial-optimization leap that takes you from ~150 to thousands of boids.
-- [8.1 The three flocking rules](08-boids/01-the-flocking-rules.md)
+- [8.1 The flocking rules](08-boids/01-the-flocking-rules.md)
 - [8.2 The naïve implementation](08-boids/02-naive-boids.md)
 - [8.3 Spatial hashing: from 150 to 2,000+](08-boids/03-spatial-hashing.md)
 - [8.4 Tuning, camera, and a predator](08-boids/04-tuning-and-interaction.md)

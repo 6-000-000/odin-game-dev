@@ -6,7 +6,7 @@ Markdown course teaching 2D gamedev with Odin + raylib to a senior web dev. Cont
 
 ```sh
 odin check <snapshot-dir>        # type-check one snapshot; MUST be zero errors
-odin build <snapshot-dir> -o:speed -out:/tmp/x   # also LINK; required for snapshots using raygui (08-boids/04, 09-game-architecture/04) — check alone misses link errors
+odin build <snapshot-dir> -o:speed -out:/tmp/x   # also LINK; required for snapshots using raygui (08-boids/04) — check alone misses link errors
 odin run <dir> -o:speed          # run; perf snapshots (08-boids/03+, 09-game-architecture/02) need -o:speed
 ```
 

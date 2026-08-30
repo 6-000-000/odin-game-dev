@@ -39,6 +39,8 @@ pipe_bottom_rect :: proc(p: Pipe) -> rl.Rectangle {
 
 `draw_pipe` now calls these too, so the pixels on screen and the hitboxes are the same numbers by construction. This is the cheapest insurance policy in gamedev: if visuals and collision are computed separately, they *will* drift apart, and players will die to pipes they visibly cleared — the most rage-inducing bug a game can ship. One proc, two consumers, zero drift.
 
+(One deliberate exception, so you're not confused when you spot it: the darker lip rectangles overhang the pipe by 3 px per side and are decoration only — no hitbox. Exercise 2 goes further and shrinks the hitbox *inside* the sprite on purpose. Shared rects are the safe default, not a law of physics.)
+
 ### Circle vs. rect
 
 The bird is a circle (that's why `radius` exists) and each pipe half is a rect. raylib has the exact test:
@@ -144,5 +146,6 @@ Pipes are lethal now: clip one and the bird tumbles to the ground, then the pane
 2. **Easy:** Forgive the player. Change both collision calls to use `bird.radius - 4` as the radius. The hitbox shrinks inside the sprite, near-misses start going your way, and the game feels instantly fairer — with zero physics changes. Real Flappy's hitbox is famously smaller than its bird.
 3. **Medium:** Add a PLATINUM tier at 50: `return {220, 245, 255, 255}, "PLATINUM"`. Placement matters — the bare `switch` evaluates top-down, so the new case must sit *above* `score >= 30` or gold swallows it. Get it wrong on purpose first and watch platinum never appear.
 4. **Medium:** Make `best` survive the window. Snake (5.3) already wrote save files: on every death, write `best` to a text file; at startup, read it back if the file exists. Ten lines, and the record book becomes permanent.
+5. **Hard:** Flight recorder: keep a 120-entry ring buffer (`[120]f32`, written at `idx %% 120`) of the last two seconds of `bird.pos.y`, and dump it to the console on death. Post-mortem data beats replaying your deaths in your head — and a ring of recent history is the seed of every replay/ghost system.
 
 **Next:** [6.4 Game feel](04-game-feel.md)

@@ -10,6 +10,7 @@ raylib compiles to WebAssembly, and Odin's `vendor:raylib` ships a `wasm` folder
 
 ```sh
 # needs the Emscripten SDK (emsdk) installed and activated
+mkdir -p build
 odin build . -target:freestanding_wasm32 -build-mode:obj \
     -out:build/game.o
 # then link with emcc against Odin's vendored raylib wasm lib + a shell html
@@ -17,7 +18,7 @@ odin build . -target:freestanding_wasm32 -build-mode:obj \
 
 The moving parts: Emscripten provides the C runtime + browser glue, Odin compiles your code to a wasm object, and a small HTML shell hosts the canvas. The main loop gets restructured slightly (the browser owns the frame callback — `emscripten_set_main_loop` — instead of your `for` loop).
 
-> **🌐 Web dev callout — finally, home turf**
+🌐 **Web dev callout — finally, home turf**
 > Everything the browser *doesn't* give you on the web (consistent frame timing, immediate-mode pixels, zero layout engine) is what made native gamedev feel strange in week one. Going back, you'll watch a 2,000-boid sim run in a tab at 60 fps with a devtools profiler you already know how to read. The full guide lives in the [Odin raylib wasm docs](https://github.com/odin-lang/Odin/tree/master/vendor/raylib#wasm) and community templates — search "odin raylib wasm template".
 
 ## Shaders: the GPU is right there

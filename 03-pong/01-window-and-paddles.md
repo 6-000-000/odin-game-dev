@@ -45,19 +45,20 @@ Paddle :: struct {
 }
 ```
 
-A design decision worth noticing: `pos` is the paddle's **center**, not its top-left. Center-based entities make collision and clamping math symmetric (`pos.y ± PADDLE_H/2`), and it matches how the ball works. Drawing needs the top-left, so the draw proc does the conversion in exactly one place:
+A design decision worth noticing: `pos` is the paddle's **center**, not its top-left. Center-based entities make collision and clamping math symmetric (`pos.y ± PADDLE_H / 2`), and it matches how the ball works. Drawing needs the top-left, so the draw proc does the conversion in exactly one place:
 
 ```odin
 draw_paddle :: proc(p: Paddle, color: rl.Color) {
 	rl.DrawRectangleV(
-		{p.pos.x - PADDLE_W/2, p.pos.y - PADDLE_H/2},
+		{p.pos.x - PADDLE_W / 2, p.pos.y - PADDLE_H / 2},
 		{PADDLE_W, PADDLE_H},
 		color,
 	)
 }
 ```
 
-🌐 **Web dev callout:** this is the "single source of truth for derived state" rule you know from frontend state management. Store one representation (center); compute the other (top-left) at render time. Never store both — they *will* desync.
+🌐 **Web dev callout — derived state gets one source of truth**
+> This is the rule you know from frontend state management. Store one representation (center); compute the other (top-left) at render time. Never store both — they *will* desync. React re-renders from state on every commit; here `draw_paddle` re-derives the rectangle from `pos` on every frame. Same discipline, no reconciler.
 
 ### Input and clamping
 
@@ -71,7 +72,7 @@ Held keys + `speed * dt` = smooth, framerate-independent movement (lesson 2.1's 
 Then the wall, one line per paddle:
 
 ```odin
-player.pos.y = clamp(player.pos.y, PADDLE_H/2, SCREEN_H - PADDLE_H/2)
+player.pos.y = clamp(player.pos.y, PADDLE_H / 2, SCREEN_H - PADDLE_H / 2)
 ```
 
 Because `pos` is the center, the allowed range is "half a paddle from each edge". Center-based storage makes this line self-evident; with top-left storage it's the kind of arithmetic you get subtly wrong at 1 AM.
@@ -116,5 +117,6 @@ Black window, two white paddles, W/S moves the left one, arrow keys move the rig
 2. **Easy:** Add `A`/`D` movement for the left paddle (x-axis), clamped to the left half of the screen. Yes, that's not Pong-rules — it's your sandbox.
 3. **Medium:** Add a `draw_center_line` proc: a dashed vertical line down the middle (a loop drawing 4×20 rectangles every 40px). It's in lesson 3.3's snapshot if you get stuck.
 4. **Medium:** Make paddle speed *charge*: while holding SHIFT, `speed` lerps up to 800 over half a second; release and it snaps back. Feel how much "game feel" lives in tiny input-response details.
+5. **Hard:** Give the paddles *weight*: replace instant velocity with acceleration — each paddle stores a `vel: f32` that eases toward ±`PADDLE_SPEED` (or 0) at 2400 px/s², then integrate `pos.y += vel * dt`. Tune the acceleration until one paddle feels like air hockey and the other like ice. Instant input is a choice, not a default — this is the experiment that proves it.
 
 **Next:** [3.2 Ball and collisions](02-ball-and-collisions.md)

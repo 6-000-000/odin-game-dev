@@ -42,7 +42,7 @@ Pipe :: struct {
 }
 
 // Find the first inactive slot and reuse it. If the pool is full, drop the
-// spawn — with these constants at most 4 pipes are ever on screen at once.
+// spawn — with these constants at most 3 pipes are ever on screen at once.
 spawn_pipe :: proc(pipes: ^[MAX_PIPES]Pipe) {
 	for &p in pipes {
 		if !p.active {

@@ -20,7 +20,7 @@ You're a senior developer. You have pattern intuition from years of web work, an
 
 One promise the course makes, stated now so you can hold us to it: **no pattern is taught before the problem it solves has hurt you — briefly, on purpose.** You'll write the object pool by hand three times (Breakout, Flappy, Asteroids) before module 9 formalizes why it works. That's not repetition, it's load-bearing: a pattern learned as *relief from felt pain* sticks; a pattern learned as *preparation for imagined pain* evaporates.
 
-> **🌐 Web dev callout — this is the RFC before the sprint**
+🌐 **Web dev callout — this is the RFC before the sprint**
 > You already work this way: before a big build, you write the design doc — not the implementation, just the shape of the problem space and the names of the moving parts. This lesson is that doc. Skim it now, forget the details, and let each name ring a bell when it shows up in a project later. Recognition is the goal, not memorization.
 
 ### The map
@@ -51,7 +51,7 @@ One promise the course makes, stated now so you can hold us to it: **no pattern 
 Module 8 gives you a 5,000-boid flocking simulation. Module 9 then does two things to your own code:
 
 1. **Rewrites its memory layout** from Array-of-Structs to Struct-of-Arrays — Odin has first-class `#soa` types, so the *code barely changes* while the layout completely changes — and measures the difference on screen.
-2. **Ports Asteroids onto a mini-ECS you build yourself** (~120 lines), then honestly compares the two versions: what improved, what got worse, and when each architecture is the right call. Spoiler: for every game in this course, the simple thing was the right call. Knowing *why* is the actual skill.
+2. **Ports Asteroids onto a mini-ECS you build yourself** (~180 lines), then honestly compares the two versions: what improved, what got worse, and when each architecture is the right call. Spoiler: for every game in this course, the simple thing was the right call. Knowing *why* is the actual skill.
 
 Patterns you will *not* need in this course (and when you would): event/message queues (decoupling many unrelated systems), the command pattern (undo, replays, netcode), scene managers (games with more than a handful of screens). Module 9.1 covers them briefly so you know they exist.
 
