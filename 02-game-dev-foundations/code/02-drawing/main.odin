@@ -30,7 +30,7 @@ main :: proc() {
 		rl.DrawRectangleLinesEx({500, 60, 100, 80}, 3, rl.DARKGREEN)
 		rl.DrawText("DrawRectangleLinesEx", 490, 150, 14, rl.GRAY)
 
-		rl.DrawTriangle({650, 140}, {700, 60}, {750, 140}, rl.ORANGE)
+		rl.DrawTriangle({650, 140}, {750, 140}, {700, 60}, rl.ORANGE) // CCW order, else back-face culled
 		rl.DrawText("DrawTriangle", 650, 150, 14, rl.GRAY)
 
 		rl.DrawLineEx({50, 220}, {150, 280}, 5, rl.MAROON)
